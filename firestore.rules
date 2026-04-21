@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection rules
+    match /users/{userId} {
+      allow read, update, delete: if request.auth.uid == userId;
+      allow create: if request.auth.uid != null;
+
+      // Workouts subcollection rules
+      match /workouts/{workoutId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+
+      // Workout plans subcollection rules
+      match /workout_plans/{planId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+  }
+}
