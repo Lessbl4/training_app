@@ -12,6 +12,15 @@ import 'package:training_app/models/workout_session_model.dart';
 
 import 'package:training_app/services/sound_service.dart';
 import 'package:training_app/core/localization_helper.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+
+class SetEntry {
+  final TextEditingController weightController;
+  final TextEditingController repsController;
+
+  SetEntry() : weightController = TextEditingController(), repsController = TextEditingController();
+}
 
 enum WorkoutState { waiting, inProgress, resting }
 
@@ -30,11 +39,13 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   late PageController _pageController;
   int _currentPage = 0;
   WorkoutState _workoutState = WorkoutState.waiting;
+  late List<List<SetEntry>> sets;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    sets = List.generate(widget.exercises.length, (index) => [SetEntry()]);
   }
 
   @override
@@ -59,20 +70,43 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   void _finishWorkout() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    List<ExerciseModel> exercises = [];
+    for (int i = 0; i < widget.exercises.length; i++) {
+      List<Map<String, double>> setsList = [];
+      for (int j = 0; j < sets[i].length; j++) {
+        final weight = double.tryParse(sets[i][j].weightController.text) ?? 0;
+        final reps = double.tryParse(sets[i][j].repsController.text) ?? 0;
+        setsList.add({"weight": weight, "reps": reps});
+      }
+      exercises.add(widget.exercises[i].copyWith(sets: setsList));
+    }
+
     final session = WorkoutSessionModel(
       startTime: DateTime.now(),
       workoutType: widget.workoutType,
-      exercises: widget.exercises,
+      exercises: exercises,
     );
-    await DatabaseService().saveWorkoutSession(session);
 
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(PageRouteBuilder(
-      opaque: false,
-      pageBuilder: (BuildContext context, _, __) {
-        return const WorkoutCompletionOverlay();
-      },
-    ));
+    try {
+      await DatabaseService().saveWorkoutSession(uid, session);
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        PageRouteBuilder(
+          opaque: false,
+          pageBuilder: (BuildContext context, _, __) {
+            return const WorkoutCompletionOverlay();
+          },
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to save workout session: $e"),
+        ),
+      );
+    }
   }
 
   @override
@@ -140,7 +174,7 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
           const SizedBox(height: UIConstants.padding16),
-          _buildSetTracker(),
+          ..._buildSetTrackers(),
           const SizedBox(height: UIConstants.padding24),
           _buildActionButtons(),
         ],
@@ -148,26 +182,44 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  Widget _buildSetTracker() {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        SizedBox(
-          width: 100,
-          child: TextField(
-            decoration: InputDecoration(labelText: "Вес (кг)"),
-            keyboardType: TextInputType.number,
-          ),
+  List<Widget> _buildSetTrackers() {
+    return sets[_currentPage].asMap().entries.map((entry) {
+      int setIndex = entry.key;
+      SetEntry setEntry = entry.value;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Text("Set ${setIndex + 1}"),
+            SizedBox(
+              width: 100,
+              child: TextField(
+                controller: setEntry.weightController,
+                decoration: const InputDecoration(labelText: "Вес (кг)"),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            SizedBox(
+              width: 100,
+              child: TextField(
+                controller: setEntry.repsController,
+                decoration: const InputDecoration(labelText: "Повторения"),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () {
+                setState(() {
+                  sets[_currentPage].add(SetEntry());
+                });
+              },
+            ),
+          ],
         ),
-        SizedBox(
-          width: 100,
-          child: TextField(
-            decoration: InputDecoration(labelText: "Повторения"),
-            keyboardType: TextInputType.number,
-          ),
-        ),
-      ],
-    );
+      );
+    }).toList();
   }
 
   Widget _buildActionButtons() {
@@ -264,12 +316,12 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       borderRadius: BorderRadius.circular(28.0),
                     ),
                   ),
-                  child: const SizedBox(
+                  child: SizedBox(
                     width: 100,
                     height: 50,
                     child: Center(
                       child: Text(
-                        "Завершить",
+                        _currentPage < widget.exercises.length - 1 ? "Далее" : "Завершить тренировку",
                         style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
                     ),

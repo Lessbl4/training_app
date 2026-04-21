@@ -1,8 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:training_app/presentation/screens/main_navigation.dart';
-import 'package:training_app/auth/auth_service.dart';
-import 'package:training_app/auth/onboarding_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:training_app/presentation/screens/onboarding/onboarding_container.dart';
 
 
 class AuthScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   final _pass = TextEditingController();
   final _confirm = TextEditingController();
 
-  final _auth = AuthService();
+  final _auth = FirebaseAuth.instance;
 
   bool isLogin = true;
   bool hide1 = true;
@@ -85,19 +85,25 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       }
     }
 
-    String? res = isLogin
-        ? await _auth.login(_email.text.trim(), _pass.text.trim())
-        : await _auth.register(_email.text.trim(), _pass.text.trim());
-
-    if (!mounted) return;
-
-    if (res != null) {
+    try {
+      if (isLogin) {
+        await _auth.signInWithEmailAndPassword(
+            email: _email.text.trim(), password: _pass.text.trim());
+      } else {
+        await _auth.createUserWithEmailAndPassword(
+            email: _email.text.trim(), password: _pass.text.trim());
+      }
+    } on FirebaseAuthException catch (e) {
       setState(() {
-        error = res;
+        error = e.message ?? "An unknown error occurred.";
         loading = false;
       });
       return;
     }
+
+    if (!mounted) return;
+
+
 
 if (!isLogin) {
       if (mounted) {
@@ -115,7 +121,7 @@ if (!isLogin) {
         context,
         CupertinoPageRoute(
           builder: (_) =>
-              isLogin ? const MainNavigation() : const OnboardingScreen(),
+              isLogin ? const MainNavigation() : const OnboardingContainer(),
         ),
       );
     }
@@ -132,7 +138,8 @@ if (!isLogin) {
       loading = true;
     });
 
-    final result = await _auth.reset(_email.text.trim());
+    await _auth.sendPasswordResetEmail(email: _email.text.trim());
+    const String? result = null;
 
     if (!mounted) return;
 

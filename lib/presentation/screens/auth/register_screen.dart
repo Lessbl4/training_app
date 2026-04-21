@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:training_app/presentation/theme/ui_constants.dart';
 import 'package:training_app/presentation/widgets/custom_error_dialog.dart';
 
-import 'package:training_app/auth/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 
 class RegisterScreen extends StatefulWidget {
@@ -18,7 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _pass = TextEditingController();
   final _confirm = TextEditingController();
 
-  final _auth = AuthService();
+  final _auth = FirebaseAuth.instance;
 
   bool hide1 = true;
   bool hide2 = true;
@@ -75,14 +75,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    String? res = await _auth.register(_email.text.trim(), _pass.text.trim());
+    String? res;
+    try {
+      await _auth.createUserWithEmailAndPassword(
+          email: _email.text.trim(), password: _pass.text.trim());
+    } on FirebaseAuthException catch (e) {
+      res = e.message;
+    }
 
     if (!mounted) return;
 
     if (res != null) {
       showDialog(
         context: context,
-        builder: (context) => CustomErrorDialog(message: res),
+        builder: (context) => CustomErrorDialog(message: res ?? 'An unknown error occurred'),
       );
       setState(() {
         loading = false;
@@ -102,25 +108,7 @@ Navigator.of(context).pop();
     }
   }
 
-    void _signInWithGoogle() async {
-    setState(() {
-      loading = true;
-    });
-    final result = await _auth.signInWithGoogle();
-    if (result != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result, style: const TextStyle(color: Colors.white)),
-          backgroundColor: Colors.grey[800],
-        ),
-      );
-    }
-    if (mounted) {
-      setState(() {
-        loading = false;
-      });
-    }
-  }
+
 
   Widget field(String hint, TextEditingController c,
       {bool obscure = false, VoidCallback? toggle}) {
@@ -189,15 +177,7 @@ Navigator.of(context).pop();
                         child: const Text("Создать аккаунт"),
                       ),
                     ),
-              const SizedBox(height: 20),
-              OutlinedButton.icon(
-                onPressed: _signInWithGoogle,
-                icon: const Icon(Icons.g_mobiledata),
-                label: const Text("Войти через Google"),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 56),
-                ),
-              ),
+
             ],
           ),
         ),

@@ -5,7 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'firebase_options.dart';
-import 'package:training_app/presentation/screens/main_navigation.dart';
+import 'package:training_app/presentation/screens/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,7 +56,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const MainNavigation(),
+      home: const AuthGate(),
     );
   }
 }

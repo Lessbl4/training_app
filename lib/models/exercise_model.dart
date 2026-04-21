@@ -8,6 +8,7 @@ class ExerciseModel {
   final String? type;
   final String? gifUrl;
   final String? description;
+  final List<Map<String, double>>? sets;
 
   ExerciseModel({
     this.name,
@@ -17,6 +18,7 @@ class ExerciseModel {
     this.type,
     this.gifUrl,
     this.description,
+    this.sets,
   });
 
   ExerciseModel copyWith({
@@ -27,6 +29,7 @@ class ExerciseModel {
     String? type,
     String? gifUrl,
     String? description,
+    List<Map<String, double>>? sets,
   }) {
     return ExerciseModel(
       name: name ?? this.name,
@@ -36,6 +39,7 @@ class ExerciseModel {
       type: type ?? this.type,
       gifUrl: gifUrl ?? this.gifUrl,
       description: description ?? this.description,
+      sets: sets ?? this.sets,
     );
   }
 
@@ -48,6 +52,7 @@ class ExerciseModel {
       'type': type,
       'gif_url': gifUrl,
       'description': description,
+      'sets': sets,
     };
   }
 
@@ -60,6 +65,7 @@ class ExerciseModel {
       type: map['type'],
       gifUrl: map['gif_url'],
       description: map['description'],
+      sets: map['sets'] != null ? List<Map<String, double>>.from(map['sets'].map((x) => Map<String, double>.from(x))) : null,
     );
   }
 

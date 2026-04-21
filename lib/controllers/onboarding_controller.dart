@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:training_app/models/user_model.dart';
 import 'package:training_app/services/database_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class OnboardingController extends ChangeNotifier {
   late PageController pageController;
@@ -79,7 +80,8 @@ Future<void> finishOnboarding() async {
     if (isEditing) {
       await _db.updateUserProfile(userModel.toMap());
     } else {
-      await _db.completeOnboarding(userModel);
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      await _db.createUserInDatabase(userModel, uid);
     }
   }
 

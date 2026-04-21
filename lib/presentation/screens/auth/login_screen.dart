@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../theme/ui_constants.dart';
 import '../../widgets/custom_error_dialog.dart';
-import '../../../auth/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _pass = TextEditingController();
 
-  final _auth = AuthService();
+  final _auth = FirebaseAuth.instance;
 
   bool hide1 = true;
   bool loading = false;
@@ -43,14 +43,20 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    String? res = await _auth.login(_email.text.trim(), _pass.text.trim());
+    String? res;
+    try {
+      await _auth.signInWithEmailAndPassword(
+          email: _email.text.trim(), password: _pass.text.trim());
+    } on FirebaseAuthException catch (e) {
+      res = e.message;
+    }
 
     if (!mounted) return;
 
     if (res != null) {
       showDialog(
         context: context,
-        builder: (context) => CustomErrorDialog(message: res),
+        builder: (context) => CustomErrorDialog(message: res ?? 'An unknown error occurred'),
       );
       setState(() {
         loading = false;
@@ -74,7 +80,12 @@ class _LoginScreenState extends State<LoginScreen> {
       loading = true;
     });
 
-    final result = await _auth.reset(_email.text.trim());
+    String? result;
+    try {
+      await _auth.sendPasswordResetEmail(email: _email.text.trim());
+    } on FirebaseAuthException catch (e) {
+      result = e.message;
+    }
 
     if (!mounted) return;
 
@@ -85,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (result != null) {
       showDialog(
         context: context,
-        builder: (context) => CustomErrorDialog(message: result),
+        builder: (context) => CustomErrorDialog(message: result ?? 'An unknown error occurred'),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -98,25 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _signInWithGoogle() async {
-    setState(() {
-      loading = true;
-    });
-    final result = await _auth.signInWithGoogle();
-    if (result != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result, style: const TextStyle(color: Colors.white)),
-          backgroundColor: Colors.grey[800],
-        ),
-      );
-    }
-    if (mounted) {
-      setState(() {
-        loading = false;
-      });
-    }
-  }
+
 
   Widget field(String hint, TextEditingController c,
       {bool obscure = false, VoidCallback? toggle}) {
@@ -190,15 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Text("Войти"),
                       ),
                     ),
-              const SizedBox(height: 20),
-              OutlinedButton.icon(
-                onPressed: _signInWithGoogle,
-                icon: const Icon(Icons.g_mobiledata),
-                label: const Text("Войти через Google"),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 56),
-                ),
-              ),
+
             ],
           ),
         ),

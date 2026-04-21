@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:training_app/presentation/widgets/gradient_card_button.dart';
 import 'package:training_app/core/ui_constants.dart';
-import 'package:training_app/presentation/screens/exercise_list_screen.dart';
+import 'package:training_app/data/workout_data.dart';
+import 'package:training_app/presentation/screens/active_workout_screen.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class SplitWorkoutScreen extends StatelessWidget {
@@ -30,7 +31,7 @@ class SplitWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ExerciseListScreen(workoutType: "split_day_1"),
+                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.splitDay1, workoutType: 'split_day_1'),
                   ),
                 );
               },
@@ -49,7 +50,7 @@ class SplitWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ExerciseListScreen(workoutType: "split_day_2"),
+                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.splitDay2, workoutType: 'split_day_2'),
                   ),
                 );
               },
@@ -68,7 +69,7 @@ class SplitWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ExerciseListScreen(workoutType: "split_day_3"),
+                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.splitDay3, workoutType: 'split_day_3'),
                   ),
                 );
               },

@@ -26,19 +26,10 @@ class DatabaseService {
     }
   }
 
-  Future<void> completeOnboarding(UserModel user) async {
-    // print("LOG: Начинаю сохранение данных пользователя...");
+  Future<void> createUserInDatabase(UserModel user, String uid) async {
     try {
-      final firebaseUser = _auth.currentUser;
-      if (firebaseUser == null) {
-        throw Exception("User not logged in");
-      }
-      final userRef = _db.collection("users").doc(firebaseUser.uid);
-      await userRef.set(user.toMap(), SetOptions(merge: true));
-      await userRef.update({"isRegistrationComplete": true});
-      // print("LOG: Данные успешно сохранены!");
+      await _db.collection("users").doc(uid).set(user.toMap());
     } catch (e) {
-      // print("CRITICAL ERROR: $e");
       rethrow;
     }
   }
@@ -138,12 +129,8 @@ class DatabaseService {
     return workout;
   }
 
-  Future<void> saveWorkoutSession(WorkoutSessionModel session) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception("User not logged in");
-    }
-
+  Future<void> saveWorkoutSession(
+      String uid, WorkoutSessionModel session) async {
     final workoutData = {
       'startTime': session.startTime,
       'workoutType': session.workoutType,
@@ -152,24 +139,19 @@ class DatabaseService {
 
     await _db
         .collection('users')
-        .doc(user.uid)
+        .doc(uid)
         .collection('workout_history')
         .add(workoutData);
 
     await updateUserXp(100);
   }
 
-  Stream<List<WorkoutSessionModel>> getWorkoutHistory() {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception("User not logged in");
-    }
-
+  Stream<List<WorkoutSessionModel>> getUserWorkoutHistory(String uid) {
     return _db
-        .collection('users')
-        .doc(user.uid)
-        .collection('workout_history')
-        .orderBy('startTime', descending: true)
+        .collection("users")
+        .doc(uid)
+        .collection("workout_history")
+        .orderBy("startTime", descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => WorkoutSessionModel.fromMap(doc.data()))

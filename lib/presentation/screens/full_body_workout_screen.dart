@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:training_app/presentation/widgets/gradient_card_button.dart';
 import 'package:training_app/core/ui_constants.dart';
-import 'package:training_app/presentation/screens/exercise_list_screen.dart';
+import 'package:training_app/data/workout_data.dart';
+import 'package:training_app/presentation/screens/active_workout_screen.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class FullBodyWorkoutScreen extends StatelessWidget {
@@ -30,7 +31,7 @@ class FullBodyWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ExerciseListScreen(workoutType: "full_body_light"),
+                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.fullBodyLight, workoutType: 'full_body_light'),
                   ),
                 );
               },
@@ -49,7 +50,7 @@ class FullBodyWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ExerciseListScreen(workoutType: "full_body_heavy"),
+                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.fullBodyHeavy, workoutType: 'full_body_heavy'),
                   ),
                 );
               },
