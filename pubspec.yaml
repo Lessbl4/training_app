@@ -1,5 +1,5 @@
 name: training_app
-description: "FitHelping - профессиональное приложение для тренировок"
+description: "Gymify - профессиональное приложение для тренировок"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -35,6 +35,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
 
 flutter:
   uses-material-design: true
@@ -44,3 +46,20 @@ flutter:
     #- assets/images/
     #- assets/gym_exercises.json
     - assets/videos/
+    - assets/images/
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/videos/images/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/images/icon.png"
+
+flutter_native_splash:
+  color: "#000000"
+  image: "assets/images/icon.png"
+  android_12:
+    image: "assets/images/icon.png"
+    icon_background_color: "#000000"
+    color: "#000000"
