@@ -8,7 +8,7 @@ import 'package:training_app/presentation/screens/onboarding/activity_level_scre
 
 import 'package:training_app/presentation/screens/onboarding/goal_selection_step.dart';
 import 'package:training_app/presentation/screens/onboarding/height_screen.dart';
-import 'package:training_app/presentation/screens/onboarding/weight_screen.dart';
+import 'package:training_app/presentation/screens/onboarding/experience_screen.dart';
 import 'package:training_app/presentation/screens/onboarding/dob_screen.dart';
 import 'package:training_app/presentation/screens/onboarding/name_screen.dart';
 import 'package:training_app/presentation/widgets/dialogs/custom_error_dialog.dart';
@@ -58,7 +58,7 @@ class _OnboardingContent extends StatelessWidget {
           DOBScreen(),
           GoalSelectionStep(),
           HeightScreen(),
-          WeightScreen(),
+          ExperienceScreen(),
           ActivityLevelScreen(),
         ],
       ),

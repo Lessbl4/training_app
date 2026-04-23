@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 
 import 'package:training_app/presentation/widgets/modals/glassmorphic_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_name_modal.dart';
-import 'package:training_app/presentation/widgets/modals/edit_weight_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_height_modal.dart';
 import 'package:training_app/widgets/custom_buttons.dart';
 import 'package:intl/intl.dart';
@@ -27,21 +28,35 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   bool get wantKeepAlive => true;
   final picker = ImagePicker();
+  bool _isUploading = false;
 
   Future<void> pickImage() async {
-    final img = await picker.pickImage(source: ImageSource.gallery);
+    final img = await picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 70, maxWidth: 512, maxHeight: 512);
     if (img == null) return;
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
+    setState(() {
+      _isUploading = true;
+    });
+
     try {
+      final ref = FirebaseStorage.instance.ref().child('avatars/$uid.jpg');
+      await ref.putFile(File(img.path));
+      final downloadUrl = await ref.getDownloadURL();
+
       await FirebaseFirestore.instance
           .collection("users")
           .doc(uid)
-          .update({"photo": img.path});
+          .update({"фото": downloadUrl});
     } catch (e) {
-      debugPrint("Error updating photo: $e");
+      debugPrint("Error uploading photo: $e");
+    } finally {
+      setState(() {
+        _isUploading = false;
+      });
     }
   }
 
@@ -87,13 +102,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           try {
             final user = snap.data!;
             final name = user.name ?? "Пользователь";
-            final photoURL = user.photoURL ?? "";
-            final weight = user.weight ?? 0;
+            final photoURL = user.photo ?? "";
             final height = user.height ?? 0;
 
-            final weightValue = weight.toDouble();
             final heightValue = height.toDouble();
-            final bmi = _calculateBmi(weightValue, heightValue);
             final age = user.dateOfBirth == null
                 ? 0
                 : DateTime.now().difference(user.dateOfBirth!).inDays ~/ 365;
@@ -107,64 +119,34 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Center(
                       child: Column(
                         children: <Widget>[
-                          _buildLevelBadge(user.level),
                           const SizedBox(height: 15),
                           GestureDetector(
                             onTap: pickImage,
                             child: Stack(
+                              alignment: Alignment.center,
                               children: <Widget>[
-                                Container(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: theme.colorScheme.primary,
-                                        width: 2),
-                                  ),
-                                  child: Hero(
-                                    tag: 'profile_avatar',
-                                    child: CircleAvatar(
-                                      radius: 55,
-                                      backgroundColor: theme
-                                          .colorScheme.surfaceContainerHighest,
-                                      child: photoURL.isNotEmpty
-                                          ? ClipOval(
-                                              child: Image.network(
-                                                photoURL,
-                                                fit: BoxFit.cover,
-                                                width: 110,
-                                                height: 110,
-                                                loadingBuilder:
-                                                    (context, child, progress) {
-                                                  return progress == null
-                                                      ? child
-                                                      : const Center(
-                                                          child:
-                                                              CupertinoActivityIndicator());
-                                                },
-                                                errorBuilder:
-                                                    (context, error, stackTrace) {
-                                                  return Icon(
-                                                      CupertinoIcons.person_fill,
-                                                      size: 50,
-                                                      color: theme
-                                                          .colorScheme.primary);
-                                                },
-                                              ),
-                                            )
-                                          : Icon(CupertinoIcons.person_fill,
-                                              size: 50,
-                                              color: theme.colorScheme.primary),
-                                    ),
-                                  ),
+                                CircleAvatar(
+                                  radius: 55,
+                                  backgroundColor:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  backgroundImage: photoURL.isNotEmpty
+                                      ? NetworkImage(photoURL)
+                                      : null,
+                                  child: photoURL.isEmpty
+                                      ? Icon(CupertinoIcons.person_fill,
+                                          size: 50,
+                                          color: theme.colorScheme.primary)
+                                      : null,
                                 ),
+                                if (_isUploading)
+                                  const CircularProgressIndicator(),
                                 Positioned(
                                   bottom: 0,
                                   right: 0,
                                   child: CircleAvatar(
                                     radius: 14,
                                     backgroundColor: theme.colorScheme.primary,
-                                    child: const Icon(
-                                        CupertinoIcons.camera_fill,
+                                    child: const Icon(CupertinoIcons.camera_fill,
                                         size: 16,
                                         color: Colors.white),
                                   ),
@@ -180,18 +162,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                     ),
                     const SizedBox(height: 30),
-                    _bmiCard(bmi),
-                    const SizedBox(height: 30),
                     Row(
                       children: <Widget>[
-                        Expanded(
-                            child: _statCard(
-                          "Вес",
-                          weight.round().toString(),
-                          "кг",
-                          CupertinoIcons.gauge,
-                        )),
-                        const SizedBox(width: 12),
                         Expanded(
                             child: _statCard(
                           "Рост",
@@ -199,11 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           "см",
                           CupertinoIcons.arrow_up_down,
                         )),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: <Widget>[
+                        const SizedBox(width: 12),
                         Expanded(
                             child: _statCard(
                           "Возраст",
@@ -213,6 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         )),
                       ],
                     ),
+                    const SizedBox(height: 12),
                     const SizedBox(height: 30),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -233,7 +202,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             FirebaseFirestore.instance
                                 .collection('users')
                                 .doc(uid)
-                                .update({'name': value});
+                                .update({'имя': value});
                           },
                         ),
                       );
@@ -244,22 +213,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         FirebaseFirestore.instance
                             .collection('users')
                             .doc(uid)
-                            .update({'dateOfBirth': date});
+                            .update({'Дата рождения': date});
                       });
-                    }),
-                    _settingTile("Изменить вес", CupertinoIcons.gauge, () {
-                      showGlassmorphicModal(
-                        context: context,
-                        builder: (context) => EditWeightModal(
-                          initialValue: weightValue,
-                          onSave: (value) {
-                            FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(uid)
-                                .update({'weight': value});
-                          },
-                        ),
-                      );
                     }),
                     _settingTile(
                         "Изменить рост", CupertinoIcons.arrow_up_down, () {
@@ -271,7 +226,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             FirebaseFirestore.instance
                                 .collection('users')
                                 .doc(uid)
-                                .update({'height': value});
+                                .update({'высота': value});
                           },
                         ),
                       );
@@ -289,72 +244,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  double _calculateBmi(double weight, double height) {
-    if (height <= 0) return 0.0;
-    final heightInMeters = height / 100;
-    return weight / (heightInMeters * heightInMeters);
-  }
-
-  Map<String, dynamic> _getBmiDetails(double bmi) {
-    if (bmi < 18.5) {
-      return {"status": "Дефицит массы", "color": Colors.yellow.shade600};
-    } else if (bmi >= 18.5 && bmi <= 24.9) {
-      return {"status": "Норма", "color": Colors.green.shade500};
-    } else if (bmi >= 25.0 && bmi <= 29.9) {
-      return {"status": "Избыточный вес", "color": Colors.yellow.shade600};
-    } else {
-      return {"status": "Ожирение", "color": Colors.red.shade500};
-    }
-  }
-
-  Widget _bmiCard(double bmi) {
-    final theme = Theme.of(context);
-    final bmiDetails = _getBmiDetails(bmi);
-    final status = bmiDetails["status"];
-    final color = bmiDetails["color"];
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withAlpha((255 * 0.3).round()),
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Индекс массы тела (ИМТ)",
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 5),
-              Text(
-                status,
-                style: theme.textTheme.bodyMedium?.copyWith(color: color),
-              ),
-            ],
-          ),
-          Text(
-            bmi.toStringAsFixed(1),
-            style: theme.textTheme.displaySmall
-                ?.copyWith(fontWeight: FontWeight.bold, color: color),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _statCard(String label, String value, String unit, IconData icon) {
     final theme = Theme.of(context);
@@ -543,53 +432,4 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildLevelBadge(int level) {
-    String badgeName;
-    Color badgeColor;
-    IconData badgeIcon;
-
-    if (level < 5) {
-      badgeName = "Новичок";
-      badgeColor = Colors.green;
-      badgeIcon = CupertinoIcons.star;
-    } else if (level < 10) {
-      badgeName = "Атлет";
-      badgeColor = Colors.blue;
-      badgeIcon = CupertinoIcons.star_fill;
-    } else {
-      badgeName = "Мастер";
-      badgeColor = Colors.purple;
-      badgeIcon = CupertinoIcons.shield_fill;
-    }
-
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: badgeColor.withAlpha((255 * 0.2).round()),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: badgeColor, width: 1),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(badgeIcon, color: badgeColor, size: 20),
-              const SizedBox(width: 8),
-              Text(badgeName,
-                  style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text("Уровень $level", style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 4),
-        LinearProgressIndicator(
-          value: (level % 5) / 5, // Прогресс до следующего уровня
-          backgroundColor: Colors.grey.shade700,
-          valueColor: AlwaysStoppedAnimation<Color>(badgeColor),
-        ),
-      ],
-    );
-  }
 }

@@ -1,8 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:training_app/presentation/theme/ui_constants.dart';
-import 'package:training_app/presentation/screens/auth/login_screen.dart';
-import 'package:training_app/presentation/screens/auth/register_screen.dart';
+import 'package:training_app/presentation/screens/auth/auth_container.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -77,7 +76,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   ElevatedButton(
                     onPressed: () => Navigator.push(
                       context,
-                      CupertinoPageRoute(builder: (_) => const RegisterScreen()),
+                      CupertinoPageRoute(builder: (_) => const AuthContainer()),
                     ),
                     style: ElevatedButton.styleFrom(
                       shape: RoundedRectangleBorder(
@@ -93,7 +92,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   OutlinedButton(
                     onPressed: () => Navigator.push(
                       context,
-                      CupertinoPageRoute(builder: (_) => const LoginScreen()),
+                      CupertinoPageRoute(builder: (_) => const AuthContainer()),
                     ),
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(

@@ -242,7 +242,7 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             child: Center(
               child: Text(
                 "Начать упражнение",
-                style: TextStyle(fontSize: 18, color: Colors.white),
+                        style: const TextStyle(fontSize: 18, color: Colors.white),
               ),
             ),
           ),

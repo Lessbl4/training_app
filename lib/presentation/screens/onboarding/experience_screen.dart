@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:training_app/controllers/onboarding_controller.dart';
-import 'package:training_app/presentation/widgets/custom_ruler_picker.dart';
 
-
-class WeightScreen extends StatelessWidget {
-  const WeightScreen({super.key});
+class ExperienceScreen extends StatelessWidget {
+  const ExperienceScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,17 +19,23 @@ class WeightScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Какой у вас вес?',
+                'Какой у вас опыт в тренировках?',
                 style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: Colors.white),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 30),
-              CustomRulerPicker(
-                min: 30,
-                max: 250,
-                unit: 'kg',
-                value: controller.userModel.weight ?? 50,
-                onChanged: (value) => controller.setWeight(value),
-              ),
+              ...['Новичок', 'Средний', 'Продвинутый'].map((level) {
+                return RadioListTile<String>(
+                  title: Text(level, style: const TextStyle(color: Colors.white)),
+                  value: level,
+                  groupValue: controller.userModel.experience,
+                  onChanged: (value) {
+                    if (value != null) {
+                      controller.setExperience(value);
+                    }
+                  },
+                );
+              }),
             ],
           ),
         ),

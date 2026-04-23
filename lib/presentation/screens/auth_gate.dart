@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:training_app/presentation/screens/auth/auth_screen.dart';
+import 'package:training_app/presentation/screens/auth/auth_container.dart';
 import 'package:training_app/presentation/screens/main_navigation.dart';
 import 'package:training_app/presentation/screens/onboarding/onboarding_container.dart';
 
@@ -14,7 +14,7 @@ class AuthGate extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const AuthScreen();
+          return const AuthContainer();
         }
 
         return StreamBuilder<DocumentSnapshot>(
@@ -23,6 +23,13 @@ class AuthGate extends StatelessWidget {
               .doc(snapshot.data!.uid)
               .snapshots(),
           builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
             if (!snapshot.hasData || !snapshot.data!.exists) {
               return const OnboardingContainer();
             }

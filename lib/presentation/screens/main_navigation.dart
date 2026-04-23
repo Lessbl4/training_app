@@ -5,6 +5,7 @@ import 'package:training_app/presentation/screens/classic_workouts_screen.dart';
 import 'package:training_app/presentation/screens/history_screen.dart';
 import 'package:training_app/presentation/screens/statistics_screen.dart';
 import 'package:training_app/presentation/screens/profile_screen.dart';
+import 'package:training_app/presentation/screens/cns_test_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -42,6 +43,7 @@ class _MainNavigationState extends State<MainNavigation> {
         children: const [
           ClassicWorkoutsScreen(),
           HistoryScreen(),
+          CNSTestScreen(),
           StatisticsScreen(),
           ProfileScreen(),
         ],
@@ -77,6 +79,10 @@ class _MainNavigationState extends State<MainNavigation> {
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.list_bullet),
                 label: "История",
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(CupertinoIcons.waveform_path_ecg),
+                label: "ЦНС Тест",
               ),
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.chart_bar_alt_fill),

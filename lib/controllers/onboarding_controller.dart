@@ -10,7 +10,9 @@ class OnboardingController extends ChangeNotifier {
   final bool isEditing;
 
   OnboardingController({UserModel? userModel, this.isEditing = false}) {
-    this.userModel = userModel ?? UserModel();
+    final user = FirebaseAuth.instance.currentUser;
+    this.userModel = userModel ?? UserModel(uid: user!.uid, email: user.email!, name: user.displayName ?? 
+'');
   }
 
   int _pageIndex = 0;
@@ -27,9 +29,9 @@ int get pageIndex => _pageIndex;
       case 3:
         return userModel.height != null;
       case 4:
-        return userModel.weight != null;
-      case 5:
         return userModel.activityLevel != null && userModel.activityLevel!.isNotEmpty;
+      case 5:
+        return userModel.experience != null && userModel.experience!.isNotEmpty;
       default:
         return true;
     }
@@ -77,6 +79,8 @@ Future<void> finishOnboarding() async {
       throw Exception('Регистрация доступна только пользователям от 13 лет');
     }
 
+    userModel.isRegistrationComplete = true;
+
     if (isEditing) {
       await _db.updateUserProfile(userModel.toMap());
     } else {
@@ -95,8 +99,8 @@ Future<void> finishOnboarding() async {
     notifyListeners();
   }
 
-  void setWeight(double weight) {
-    userModel.weight = weight;
+  void setExperience(String experience) {
+    userModel.experience = experience;
     notifyListeners();
   }
 
