@@ -29,9 +29,9 @@ int get pageIndex => _pageIndex;
       case 3:
         return userModel.height != null;
       case 4:
-        return userModel.activityLevel != null && userModel.activityLevel!.isNotEmpty;
-      case 5:
         return userModel.experience != null && userModel.experience!.isNotEmpty;
+      case 5:
+        return userModel.activityLevel != null && userModel.activityLevel!.isNotEmpty;
       default:
         return true;
     }
