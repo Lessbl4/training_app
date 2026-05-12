@@ -34,8 +34,8 @@ class AuthGate extends StatelessWidget {
               return const OnboardingContainer();
             }
 
-            final data = snapshot.data!.data() as Map<String, dynamic>;
-            if (data['height'] == null || data['weight'] == null) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+            if (data['isRegistrationComplete'] != true) {
               return const OnboardingContainer();
             }
 

@@ -15,6 +15,7 @@ import 'package:intl/intl.dart';
 import 'package:training_app/services/sound_service.dart';
 import 'package:training_app/models/user_model.dart';
 import 'package:training_app/services/database_service.dart';
+import 'package:training_app/presentation/widgets/profile/cns_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -182,6 +183,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ],
                     ),
                     const SizedBox(height: 12),
+                    const CnsCard(),
                     const SizedBox(height: 30),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),

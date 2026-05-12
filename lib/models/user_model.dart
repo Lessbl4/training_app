@@ -11,6 +11,7 @@ class UserModel {
   String? experience;
   String? goal;
   double? height;
+  double? weight;
 
   UserModel({
     required this.uid,
@@ -23,6 +24,7 @@ class UserModel {
     this.experience,
     this.goal,
     this.height,
+    this.weight,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -37,6 +39,7 @@ class UserModel {
       experience: map['опыт'],
       goal: map['цель'],
       height: map['высота']?.toDouble(),
+      weight: map['вес']?.toDouble(),
     );
   }
 
@@ -52,6 +55,7 @@ class UserModel {
       if (experience != null) 'опыт': experience,
       if (goal != null) 'цель': goal,
       if (height != null) 'высота': height,
+      if (weight != null) 'вес': weight,
     };
   }
 }
