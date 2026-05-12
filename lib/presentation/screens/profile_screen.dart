@@ -9,13 +9,14 @@ import 'dart:io';
 import 'package:training_app/presentation/widgets/modals/glassmorphic_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_name_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_height_modal.dart';
+import 'package:training_app/presentation/widgets/modals/edit_weight_modal.dart';
 import 'package:training_app/widgets/custom_buttons.dart';
 import 'package:intl/intl.dart';
 
 import 'package:training_app/services/sound_service.dart';
 import 'package:training_app/models/user_model.dart';
 import 'package:training_app/services/database_service.dart';
-import 'package:training_app/presentation/widgets/profile/cns_card.dart';
+import 'package:training_app/presentation/widgets/profile/bmi_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -104,9 +105,11 @@ class _ProfileScreenState extends State<ProfileScreen>
             final user = snap.data!;
             final name = user.name ?? "Пользователь";
             final photoURL = user.photo ?? "";
-            final height = user.height ?? 0;
+            final height = user.height ?? 0.0;
+            final weight = user.weight ?? 0.0; // Добавили вес
 
             final heightValue = height.toDouble();
+            final weightValue = weight.toDouble();
             final age = user.dateOfBirth == null
                 ? 0
                 : DateTime.now().difference(user.dateOfBirth!).inDays ~/ 365;
@@ -161,16 +164,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   ?.copyWith(fontWeight: FontWeight.bold)),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 30),
+                    ),const SizedBox(height: 30),
                     Row(
                       children: <Widget>[
                         Expanded(
                             child: _statCard(
                           "Рост",
-                          height.round().toString(),
+                          heightValue.round().toString(),
                           "см",
                           CupertinoIcons.arrow_up_down,
+                        )),
+                        const SizedBox(width: 12),
+Expanded(
+                            child: _statCard(
+                          "Вес", // Добавили карточку веса в UI
+                          weightValue.round().toString(),
+                          "кг",
+                          CupertinoIcons.gauge,
                         )),
                         const SizedBox(width: 12),
                         Expanded(
@@ -183,7 +193,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ],
                     ),
                     const SizedBox(height: 12),
-                    const CnsCard(),
+                    // Теперь передаем реальные данные в CnsCard
+BmiCard(height: heightValue, weight: weightValue),
                     const SizedBox(height: 30),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -223,12 +234,27 @@ class _ProfileScreenState extends State<ProfileScreen>
                       showGlassmorphicModal(
                         context: context,
                         builder: (context) => EditHeightModal(
-                          initialValue: heightValue,
+                          initialValue: heightValue < 100.0 ? 170.0 : heightValue,
                           onSave: (value) {
                             FirebaseFirestore.instance
                                 .collection('users')
                                 .doc(uid)
                                 .update({'высота': value});
+                          },
+                        ),
+                      );
+                    }),
+                    _settingTile(
+                        "Изменить вес", CupertinoIcons.gauge, () {
+showGlassmorphicModal(
+                        context: context,
+                        builder: (context) => EditWeightModal(
+                          initialValue: weightValue < 30.0 ? 70.0 : weightValue,
+                          onSave: (value) {
+                            FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(uid)
+                                .update({'вес': value});
                           },
                         ),
                       );
@@ -246,49 +272,67 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-
+  // Оставляем методы _statCard, _showDatePicker, _calculateAge и _settingTile без изменений
   Widget _statCard(String label, String value, String unit, IconData icon) {
     final theme = Theme.of(context);
-
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurface.withAlpha(178))),
-        const SizedBox(height: 2),
-        Text(value,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold)),
-        if (unit.isNotEmpty)
-          Text(unit,
-              style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withAlpha(178))),
-      ],
-    );
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 100), // Задаем минимальную высоту
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary.withAlpha(25),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: theme.colorScheme.primary, size: 24),
+              child: Icon(icon, color: theme.colorScheme.primary, size: 22),
             ),
-            const SizedBox(width: 15),
-            content,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withAlpha(200),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  value,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (unit.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 4),
+                    child: Text(
+                      unit,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withAlpha(178),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showDatePicker(
+ void _showDatePicker(
       BuildContext context, DateTime? initialDate, Function(DateTime) onSave) {
     DateTime selectedDate = initialDate ??
         DateTime(DateTime.now().year - 13, DateTime.now().month,
@@ -403,8 +447,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       },
     );
   }
-
-  int _calculateAge(DateTime birthDate) {
+ int _calculateAge(DateTime birthDate) {
     final now = DateTime.now();
     int age = now.year - birthDate.year;
     if (now.month < birthDate.month ||
@@ -414,12 +457,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     return age < 0 ? 0 : age;
   }
 
-  Widget _settingTile(String title, IconData icon, VoidCallback onTap,
-      {bool isDestructive = false}) {
+  Widget _settingTile(String title, IconData icon, VoidCallback onTap, {bool isDestructive = false}) {
     final theme = Theme.of(context);
-    final color =
-        isDestructive ? theme.colorScheme.error : theme.colorScheme.onSurface;
-
+    final color = isDestructive ? theme.colorScheme.error : theme.colorScheme.onSurface;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
@@ -433,5 +473,4 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     );
   }
-
 }

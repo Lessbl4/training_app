@@ -8,6 +8,7 @@ import 'package:training_app/presentation/screens/onboarding/activity_level_scre
 
 import 'package:training_app/presentation/screens/onboarding/goal_selection_step.dart';
 import 'package:training_app/presentation/screens/onboarding/height_screen.dart';
+import 'package:training_app/presentation/screens/onboarding/weight_screen.dart';
 import 'package:training_app/presentation/screens/onboarding/experience_screen.dart';
 import 'package:training_app/presentation/screens/onboarding/dob_screen.dart';
 import 'package:training_app/presentation/screens/onboarding/name_screen.dart';
@@ -47,28 +48,29 @@ class _OnboardingContent extends StatelessWidget {
             : null,
         title: GymifyProgressBar(
           current: controller.pageIndex + 1,
-          total: 6,
+          total: 7,
         ),
       ),
        body: PageView(
         controller: controller.pageController,
         physics: const NeverScrollableScrollPhysics(),
-        children: const [
-          NameScreen(),
-          DOBScreen(),
-          GoalSelectionStep(),
-          HeightScreen(),
-          ExperienceScreen(),
-          ActivityLevelScreen(),
-        ],
+         children: const [
+           NameScreen(),
+           DOBScreen(),
+           GoalSelectionStep(),
+           HeightScreen(),
+           WeightScreen(),
+           ExperienceScreen(),
+           ActivityLevelScreen(),
+         ],
       ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(20.0),
         child: ElevatedButton(
-onPressed: controller.isNextButtonEnabled ? () async {
-              if (controller.pageIndex == 5) {
-                try {
-await controller.finishOnboarding();
+ onPressed: controller.isNextButtonEnabled ? () async {
+               if (controller.pageIndex == 6) {
+                 try {
+ await controller.finishOnboarding();
 if (context.mounted) {
                   Navigator.pushAndRemoveUntil(
                     context,
@@ -90,7 +92,7 @@ if (context.mounted) {
                 controller.nextPage();
               }
             } : null,
-          child: Text(controller.isEditing ? "Сохранить" : (controller.pageIndex == 5 ? "Завершить" : "Далее")),
+          child: Text(controller.isEditing ? "Сохранить" : (controller.pageIndex == 6 ? "Завершить" : "Далее")),
         ),
       ),
     );

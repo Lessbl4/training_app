@@ -29,8 +29,10 @@ int get pageIndex => _pageIndex;
       case 3:
         return userModel.height != null;
       case 4:
-        return userModel.experience != null && userModel.experience!.isNotEmpty;
+        return userModel.weight != null;
       case 5:
+        return userModel.experience != null && userModel.experience!.isNotEmpty;
+      case 6:
         return userModel.activityLevel != null && userModel.activityLevel!.isNotEmpty;
       default:
         return true;
@@ -49,7 +51,7 @@ int get pageIndex => _pageIndex;
 Future<void> nextPage() async {
     if (!isNextButtonEnabled) return;
 
-    if (_pageIndex < 5) { // Adjusted for new screens
+    if (_pageIndex < 6) { // Adjusted for new screens
       _pageIndex++;
       pageController.animateToPage(
         _pageIndex,
@@ -106,6 +108,11 @@ Future<void> finishOnboarding() async {
 
   void setHeight(double height) {
     userModel.height = height;
+    notifyListeners();
+  }
+
+  void setWeight(double weight) {
+    userModel.weight = weight;
     notifyListeners();
   }
 
