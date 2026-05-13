@@ -5,7 +5,7 @@ class GradientCardButton extends StatelessWidget {
   final String? subtitle;
   final IconData icon;
   final Gradient gradient;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   const GradientCardButton({
     super.key,
@@ -13,7 +13,7 @@ class GradientCardButton extends StatelessWidget {
     this.subtitle,
     required this.icon,
     required this.gradient,
-    required this.onPressed,
+    this.onPressed,
   });
 
   @override
@@ -21,7 +21,6 @@ class GradientCardButton extends StatelessWidget {
     return GestureDetector(
       onTap: onPressed,
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.8,
         height: 150,
         decoration: BoxDecoration(
           gradient: gradient,
@@ -49,13 +48,17 @@ class GradientCardButton extends StatelessWidget {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                      ),
                     ),
                   ),
                   if (subtitle != null) ...[

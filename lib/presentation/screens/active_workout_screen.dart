@@ -45,14 +45,16 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   WorkoutState _workoutState = WorkoutState.waiting;
   late List<List<SetEntry>> sets;
   late List<List<bool>> checkedSets;
+  late DateTime _startTime;
 
-@override
+  @override
   void initState() {
     super.initState();
     _pageController = PageController();
     sets = List.generate(widget.exercises.length, (index) => [SetEntry()]);
     checkedSets = List.generate(
         widget.exercises.length, (index) => List.generate(1, (i) => false));
+    _startTime = DateTime.now();
   }
 
   @override
@@ -62,41 +64,65 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   void _showRestTimer(BuildContext context) {
-    Navigator.of(context).push(PageRouteBuilder(
-      opaque: false,
-      pageBuilder: (BuildContext context, _, __) {
-return RestTimer(
-          duration: 60,
-          onTimerEnd: () {
-            Navigator.of(context).pop();
-            SoundService.playNotify();
-          },
-          onSkip: () {
-            Navigator.of(context).pop();
-            SoundService.playNotify();
-          },
-        );
-      },
-    ));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => RestTimer(
+        duration: 60,
+        onTimerEnd: () {
+          Navigator.of(context).pop();
+          SoundService.playNotify();
+        },
+        onSkip: () {
+          Navigator.of(context).pop();
+          SoundService.playNotify();
+        },
+      ),
+    );
   }
 
   void _finishWorkout() async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     List<ExerciseModel> exercises = [];
+    double totalTonnage = 0;
+    bool hasCompletedSets = false;
+
     for (int i = 0; i < widget.exercises.length; i++) {
       List<Map<String, double>> setsList = [];
-      for (int j = 0; j < sets[i].length; j++) {
-        final weight = double.tryParse(sets[i][j].weightController.text) ?? 0;
-        final reps = double.tryParse(sets[i][j].repsController.text) ?? 0;
-        setsList.add({"weight": weight, "reps": reps});
+      for (int j = 0; j < sets[i].length - 1; j++) { // minus 1 to exclude the empty set
+        if (checkedSets[i][j]) {
+          final weight = double.tryParse(sets[i][j].weightController.text) ?? 0;
+          final reps = double.tryParse(sets[i][j].repsController.text) ?? 0;
+          if (weight > 0 && reps > 0) {
+            totalTonnage += weight * reps;
+            setsList.add({"weight": weight, "reps": reps});
+            hasCompletedSets = true;
+          }
+        }
       }
-      exercises.add(widget.exercises[i].copyWith(sets: setsList));
+      if (setsList.isNotEmpty) {
+        exercises.add(widget.exercises[i].copyWith(sets: setsList));
+      }
     }
 
+    if (!hasCompletedSets) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Вы не выполнили ни одного подхода. Тренировка не будет сохранена."),
+        ),
+      );
+      return;
+    }
+
+    final durationInSeconds = DateTime.now().difference(_startTime).inSeconds;
+
     final session = WorkoutSessionModel(
-      startTime: DateTime.now(),
+      startTime: _startTime,
       workoutType: widget.workoutType,
       exercises: exercises,
+      durationInSeconds: durationInSeconds,
+      totalTonnage: totalTonnage,
     );
 
     try {
@@ -106,7 +132,7 @@ return RestTimer(
         PageRouteBuilder(
           opaque: false,
           pageBuilder: (BuildContext context, _, __) {
-            return const WorkoutCompletionOverlay();
+            return WorkoutCompletionOverlay(session: session);
           },
         ),
         (route) => false,
@@ -237,6 +263,12 @@ return RestTimer(
       SetEntry setEntry = entry.value;
       bool isChecked = checkedSets[_currentPage][setIndex];
 
+      final weight = double.tryParse(setEntry.weightController.text) ?? 0;
+      final reps = double.tryParse(setEntry.repsController.text) ?? 0;
+
+      final isWeightFilled = setEntry.weightController.text.isNotEmpty && weight > 0;
+      final isRepsFilled = setEntry.repsController.text.isNotEmpty && reps > 0;
+
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -259,49 +291,22 @@ return RestTimer(
               ),
             ),
             const Spacer(),
-            SizedBox(
-              width: 80,
-              child: TextField(
-                controller: setEntry.weightController,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: "Вес (кг)",
-                  labelStyle: TextStyle(color: Colors.grey),
-                  border: InputBorder.none,
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            ),
-            SizedBox(
-              width: 80,
-              child: TextField(
-                controller: setEntry.repsController,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: "Повторы",
-                  labelStyle: TextStyle(color: Colors.grey),
-                  border: InputBorder.none,
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            ),
+            _buildSetTextField(setEntry.weightController, "Вес (кг)", 600, isChecked, isWeightFilled),
+            const SizedBox(width: 16),
+            _buildSetTextField(setEntry.repsController, "Повторы", 100, isChecked, isRepsFilled),
             const SizedBox(width: 16),
             GestureDetector(
               onTap: () {
+                if (isChecked || !isWeightFilled || !isRepsFilled) return;
                 HapticFeedback.lightImpact();
                 SoundService.playClick();
                 setState(() {
-                  checkedSets[_currentPage][setIndex] = !isChecked;
-                  if (checkedSets[_currentPage][setIndex]) {
-                    // Add a new set if the last one was checked
-                    if (setIndex == sets[_currentPage].length - 1) {
-                      sets[_currentPage].add(SetEntry());
-                      checkedSets[_currentPage].add(false);
-                    }
-                    _showRestTimer(context);
+                  checkedSets[_currentPage][setIndex] = true;
+                  if (setIndex == sets[_currentPage].length - 1) {
+                    sets[_currentPage].add(SetEntry());
+                    checkedSets[_currentPage].add(false);
                   }
+                  _showRestTimer(context);
                 });
               },
               child: AnimatedContainer(
@@ -312,7 +317,11 @@ return RestTimer(
                   shape: BoxShape.circle,
                   color: isChecked ? theme.colorScheme.primary : Colors.transparent,
                   border: Border.all(
-                    color: isChecked ? theme.colorScheme.primary : Colors.grey,
+                    color: isChecked
+                        ? theme.colorScheme.primary
+                        : (isWeightFilled && isRepsFilled)
+                            ? theme.colorScheme.primary
+                            : Colors.grey,
                     width: 2,
                   ),
                 ),
@@ -327,33 +336,117 @@ return RestTimer(
     }).toList();
   }
 
+  Widget _buildSetTextField(TextEditingController controller, String label, double maxValue, bool isChecked, bool isFilled) {
+    final theme = Theme.of(context);
+    return Container(
+      width: 65,
+      height: 45,
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isFilled ? theme.colorScheme.primary : Colors.grey.withOpacity(0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Center(
+        child: TextField(
+          controller: controller,
+          readOnly: isChecked,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            hintText: label,
+            hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          ),
+          keyboardType: TextInputType.number,
+          inputFormatters: <TextInputFormatter>[
+            FilteringTextInputFormatter.digitsOnly,
+            TextInputFormatter.withFunction((oldValue, newValue) {
+              if (newValue.text.isEmpty) return newValue;
+              final number = double.tryParse(newValue.text);
+              if (number != null && number > maxValue) {
+                return TextEditingValue(text: maxValue.toInt().toString());
+              }
+              return newValue;
+            }),
+          ],
+          onChanged: (value) {
+            setState(() {});
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildActionButtons() {
     final theme = Theme.of(context);
     final isLastExercise = _currentPage == widget.exercises.length - 1;
 
-    return GradientCardButton(
-      title: isLastExercise ? "Завершить тренировку" : "Следующее упражнение",
-      icon: isLastExercise
-          ? CupertinoIcons.square_arrow_down_on_square_fill
-          : CupertinoIcons.arrow_right_circle_fill,
-      gradient: LinearGradient(
-        colors: isLastExercise
-            ? [theme.colorScheme.error, theme.colorScheme.error.withOpacity(0.7)]
-            : [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.7)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      onPressed: () {
-        if (isLastExercise) {
-          _finishWorkout();
-        } else {
-          _pageController.nextPage(
-              duration: const Duration(milliseconds: 300), curve: Curves.easeIn);
-          setState(() {
-            _workoutState = WorkoutState.waiting;
-          });
+    bool allSetsCompleted() {
+      if (checkedSets.isEmpty || _currentPage >= checkedSets.length) {
+        return false;
+      }
+      final currentExerciseSets = checkedSets[_currentPage];
+      for (int i = 0; i < currentExerciseSets.length - 1; i++) {
+        if (!currentExerciseSets[i]) {
+          return false;
         }
-      },
+      }
+      return currentExerciseSets.length > 1;
+    }
+
+    final isButtonEnabled = allSetsCompleted();
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: GestureDetector(
+          onTap: () {
+            if (!isButtonEnabled) {
+              ScaffoldMessenger.of(context).removeCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Выполните все подходы!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          },
+          child: SizedBox(
+            height: 56,
+            child: GradientCardButton(
+              title: isLastExercise ? "Завершить тренировку" : "Следующее упражнение",
+              icon: isLastExercise
+                  ? CupertinoIcons.square_arrow_down_on_square_fill
+                  : CupertinoIcons.arrow_right_circle_fill,
+              gradient: LinearGradient(
+                colors: isLastExercise
+                    ? [theme.colorScheme.error, theme.colorScheme.error.withOpacity(0.7)]
+                    : [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onPressed: isButtonEnabled
+                  ? () {
+                      if (isLastExercise) {
+                        _finishWorkout();
+                      } else {
+                        _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeIn);
+                        setState(() {
+                          _workoutState = WorkoutState.waiting;
+                        });
+                      }
+                    }
+                  : null,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

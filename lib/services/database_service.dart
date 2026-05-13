@@ -131,17 +131,11 @@ class DatabaseService {
 
   Future<void> saveWorkoutSession(
       String uid, WorkoutSessionModel session) async {
-    final workoutData = {
-      'startTime': session.startTime,
-      'workoutType': session.workoutType,
-      'exercises': session.exercises.map((e) => e.toMap()).toList(),
-    };
-
     await _db
         .collection('users')
         .doc(uid)
         .collection('workout_history')
-        .add(workoutData);
+        .add(session.toMap());
 
     await updateUserXp(100);
   }
