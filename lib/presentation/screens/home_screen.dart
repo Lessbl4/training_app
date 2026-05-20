@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:glassmorphism/glassmorphism.dart';
 import 'package:training_app/presentation/screens/classic_workouts_screen.dart';
+import 'package:training_app/presentation/screens/ai_loading_screen.dart'; // ДОБАВЛЕН ИМПОРТ НОВОГО ЭКРАНА
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -39,9 +40,16 @@ class HomeScreen extends StatelessWidget {
             icon: CupertinoIcons.person_crop_circle_fill,
             colors: [Colors.orange.shade700, Colors.orange.shade900],
             onTap: () {
-              // В будущем здесь будет вызов алгоритма расчета
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Скоро: Расчет по твоим параметрам!')),
+              // ЗАПУСКАЕМ ЭКРАН ИИ (Дублирование убрано)
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) => const AILoadingScreen(),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+                  transitionDuration: const Duration(milliseconds: 500),
+                ),
               );
             },
           ),
