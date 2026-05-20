@@ -381,7 +381,7 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
+Widget _buildActionButtons() {
     final theme = Theme.of(context);
     final isLastExercise = _currentPage == widget.exercises.length - 1;
 
@@ -413,36 +413,61 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   duration: Duration(seconds: 2),
                 ),
               );
+            } else {
+              if (isLastExercise) {
+                _finishWorkout();
+              } else {
+                _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeIn);
+                setState(() {
+                  _workoutState = WorkoutState.waiting;
+                });
+              }
             }
           },
-          child: SizedBox(
-            height: 56,
-            child: GradientCardButton(
-              title: isLastExercise ? "Завершить тренировку" : "Следующее упражнение",
-              icon: isLastExercise
-                  ? CupertinoIcons.square_arrow_down_on_square_fill
-                  : CupertinoIcons.arrow_right_circle_fill,
-              gradient: LinearGradient(
-                colors: isLastExercise
-                    ? [theme.colorScheme.error, theme.colorScheme.error.withOpacity(0.7)]
-                    : [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.7)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          child: Opacity(
+            opacity: isButtonEnabled ? 1.0 : 0.5, // Делаем кнопку полупрозрачной, если она не активна
+            child: Container(
+              height: 56, // Фиксированная и безопасная высота для нижнего бара
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isLastExercise
+                      ? [theme.colorScheme.error, theme.colorScheme.error.withOpacity(0.7)]
+                      : [theme.colorScheme.primary, theme.colorScheme.primary.withOpacity(0.7)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16.0),
+                boxShadow: [
+                  if (isButtonEnabled) // Тень только у активной кнопки
+                    BoxShadow(
+                      color: (isLastExercise ? theme.colorScheme.error : theme.colorScheme.primary).withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                ],
               ),
-              onPressed: isButtonEnabled
-                  ? () {
-                      if (isLastExercise) {
-                        _finishWorkout();
-                      } else {
-                        _pageController.nextPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeIn);
-                        setState(() {
-                          _workoutState = WorkoutState.waiting;
-                        });
-                      }
-                    }
-                  : null,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    isLastExercise ? "Завершить тренировку" : "Следующее упражнение",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    isLastExercise
+                        ? CupertinoIcons.square_arrow_down_on_square_fill
+                        : CupertinoIcons.arrow_right_circle_fill,
+                    color: Colors.white,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

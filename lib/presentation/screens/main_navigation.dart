@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:training_app/services/sound_service.dart';
-import 'package:training_app/presentation/screens/classic_workouts_screen.dart';
+import 'package:training_app/presentation/screens/home_screen.dart'; // ПОДКЛЮЧИЛИ НОВЫЙ ЭКРАН
 import 'package:training_app/presentation/screens/history_screen.dart';
 import 'package:training_app/presentation/screens/statistics_screen.dart';
 import 'package:training_app/presentation/screens/profile_screen.dart';
@@ -41,7 +41,7 @@ class _MainNavigationState extends State<MainNavigation> {
           });
         },
         children: const [
-          ClassicWorkoutsScreen(),
+          HomeScreen(), // <--- ТЕПЕРЬ ПЕРВЫМ ГРУЗИТСЯ ГЛАВНОЕ МЕНЮ
           HistoryScreen(),
           CNSTestScreen(),
           StatisticsScreen(),
@@ -74,7 +74,7 @@ class _MainNavigationState extends State<MainNavigation> {
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.flame),
-                label: "Тренировка",
+                label: "Главная", // Немного изменим название логически
               ),
               BottomNavigationBarItem(
                 icon: Icon(CupertinoIcons.list_bullet),

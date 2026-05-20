@@ -12,6 +12,9 @@ class UserModel {
   String? goal;
   double? height;
   double? weight;
+  // НОВЫЕ ПОЛЯ ДЛЯ ПОДПИСКИ
+  bool isPro;
+  DateTime? proExpiryDate;
 
   UserModel({
     required this.uid,
@@ -25,6 +28,8 @@ class UserModel {
     this.goal,
     this.height,
     this.weight,
+    this.isPro = false, // По умолчанию подписки нет
+    this.proExpiryDate,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -40,6 +45,9 @@ class UserModel {
       goal: map['цель'],
       height: map['высота']?.toDouble(),
       weight: map['вес']?.toDouble(),
+      // Загружаем данные о подписке
+      isPro: map['isPro'] ?? false,
+      proExpiryDate: (map['proExpiryDate'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -56,6 +64,9 @@ class UserModel {
       if (goal != null) 'цель': goal,
       if (height != null) 'высота': height,
       if (weight != null) 'вес': weight,
+      // Сохраняем данные о подписке
+      'isPro': isPro,
+      if (proExpiryDate != null) 'proExpiryDate': Timestamp.fromDate(proExpiryDate!),
     };
   }
 }

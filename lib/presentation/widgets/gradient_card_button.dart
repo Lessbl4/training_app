@@ -21,19 +21,22 @@ class GradientCardButton extends StatelessWidget {
     return GestureDetector(
       onTap: onPressed,
       child: Container(
+        width: double.infinity, // Растягиваем кнопку на всю доступную ширину
         height: 150,
+        margin: const EdgeInsets.symmetric(horizontal: 20.0), // Отступы от краев экрана
         decoration: BoxDecoration(
           gradient: gradient,
           borderRadius: BorderRadius.circular(24.0),
           boxShadow: [
             BoxShadow(
-              color: (gradient.colors.first).withAlpha((255 * 0.4).round()),
+              color: gradient.colors.first.withAlpha((255 * 0.4).round()),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Stack(
+          clipBehavior: Clip.hardEdge,
           children: [
             Positioned(
               right: -20,
@@ -45,13 +48,15 @@ class GradientCardButton extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20.0),
+              // right: 80.0 не дает тексту наехать на большую иконку справа
+              padding: const EdgeInsets.only(left: 20.0, top: 20.0, bottom: 20.0, right: 80.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center, // Центрируем текст по вертикали
                 children: [
                   FittedBox(
                     fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
                     child: Text(
                       title,
                       style: const TextStyle(
@@ -69,6 +74,8 @@ class GradientCardButton extends StatelessWidget {
                         color: Colors.white70,
                         fontSize: 16,
                       ),
+                      maxLines: 2, // Ограничиваем количество строк
+                      overflow: TextOverflow.ellipsis, // Ставим троеточие, если текст не влезает
                     ),
                   ],
                 ],

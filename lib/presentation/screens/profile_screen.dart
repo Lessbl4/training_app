@@ -6,6 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 
+import 'package:flutter/services.dart'; 
+import 'package:glassmorphism/glassmorphism.dart'; 
+
 import 'package:training_app/presentation/widgets/modals/glassmorphic_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_name_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_height_modal.dart';
@@ -106,13 +109,26 @@ class _ProfileScreenState extends State<ProfileScreen>
             final name = user.name ?? "Пользователь";
             final photoURL = user.photo ?? "";
             final height = user.height ?? 0.0;
-            final weight = user.weight ?? 0.0; // Добавили вес
+            final weight = user.weight ?? 0.0;
 
             final heightValue = height.toDouble();
             final weightValue = weight.toDouble();
             final age = user.dateOfBirth == null
                 ? 0
                 : DateTime.now().difference(user.dateOfBirth!).inDays ~/ 365;
+
+            // Логика проверки подписки из Базы Данных
+            bool isProActive = user.isPro;
+            int daysLeft = 0;
+            
+            if (isProActive && user.proExpiryDate != null) {
+              daysLeft = user.proExpiryDate!.difference(DateTime.now()).inDays;
+              // Если дни ушли в минус, подписка истекла (можно дополнительно триггерить обнуление в БД)
+              if (daysLeft < 0) {
+                isProActive = false;
+                daysLeft = 0;
+              }
+            }
 
             return SingleChildScrollView(
               child: Padding(
@@ -162,9 +178,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                           Text(name,
                               style: theme.textTheme.headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          // БЕЙДЖ ПОДПИСКИ
+                          isProActive ? _buildProBadge(daysLeft) : _buildFreeBadge(),
                         ],
                       ),
-                    ),const SizedBox(height: 30),
+                    ),
+                    const SizedBox(height: 30),
                     Row(
                       children: <Widget>[
                         Expanded(
@@ -175,9 +195,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                           CupertinoIcons.arrow_up_down,
                         )),
                         const SizedBox(width: 12),
-Expanded(
+                        Expanded(
                             child: _statCard(
-                          "Вес", // Добавили карточку веса в UI
+                          "Вес", 
                           weightValue.round().toString(),
                           "кг",
                           CupertinoIcons.gauge,
@@ -193,9 +213,13 @@ Expanded(
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // Теперь передаем реальные данные в CnsCard
-BmiCard(height: heightValue, weight: weightValue),
+                    BmiCard(height: heightValue, weight: weightValue),
+                    const SizedBox(height: 24),
+                    
+                    // КАРТОЧКА ПОДПИСКИ
+                    _buildSubscriptionCard(context, isProActive, daysLeft, user.proExpiryDate),
                     const SizedBox(height: 30),
+
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Text(
@@ -246,7 +270,7 @@ BmiCard(height: heightValue, weight: weightValue),
                     }),
                     _settingTile(
                         "Изменить вес", CupertinoIcons.gauge, () {
-showGlassmorphicModal(
+                      showGlassmorphicModal(
                         context: context,
                         builder: (context) => EditWeightModal(
                           initialValue: weightValue < 30.0 ? 70.0 : weightValue,
@@ -272,7 +296,6 @@ showGlassmorphicModal(
     );
   }
 
-  // Оставляем методы _statCard, _showDatePicker, _calculateAge и _settingTile без изменений
   Widget _statCard(String label, String value, String unit, IconData icon) {
     final theme = Theme.of(context);
     return Container(
@@ -282,7 +305,7 @@ showGlassmorphicModal(
       ),
       padding: const EdgeInsets.all(12),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 100), // Задаем минимальную высоту
+        constraints: const BoxConstraints(minHeight: 100),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,7 +355,7 @@ showGlassmorphicModal(
     );
   }
 
- void _showDatePicker(
+  void _showDatePicker(
       BuildContext context, DateTime? initialDate, Function(DateTime) onSave) {
     DateTime selectedDate = initialDate ??
         DateTime(DateTime.now().year - 13, DateTime.now().month,
@@ -341,7 +364,6 @@ showGlassmorphicModal(
     const int minYear = 1950;
     final int maxYear = DateTime.now().year;
 
-    // Жестко ограничиваем начальную дату, чтобы избежать креша
     if (selectedDate.year < minYear) {
       selectedDate = DateTime(minYear);
     }
@@ -362,7 +384,6 @@ showGlassmorphicModal(
             final bool isOldEnough = currentAge >= 13;
 
             void onDateChanged(DateTime newDate) {
-              // Дополнительная валидация, чтобы избежать выхода за границы при скролле
               DateTime clampedDate = newDate;
               if (clampedDate.isAfter(DateTime.now())) {
                 clampedDate = DateTime.now();
@@ -447,7 +468,8 @@ showGlassmorphicModal(
       },
     );
   }
- int _calculateAge(DateTime birthDate) {
+
+  int _calculateAge(DateTime birthDate) {
     final now = DateTime.now();
     int age = now.year - birthDate.year;
     if (now.month < birthDate.month ||
@@ -472,5 +494,371 @@ showGlassmorphicModal(
         trailing: const Icon(CupertinoIcons.chevron_right, size: 18),
       ),
     );
+  }
+
+  // === МЕТОДЫ ПОДПИСКИ ===
+
+  Widget _buildFreeBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Text(
+        'BASE План',
+        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildProBadge(int daysLeft) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Colors.amber, Colors.orangeAccent],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          )
+        ]
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(CupertinoIcons.star_fill, color: Colors.white, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            'PRO ДОСТУП ($daysLeft ДН.)',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionCard(BuildContext context, bool isProActive, int daysLeft, DateTime? proExpiryDate) {
+    String formattedDate = '';
+    if (isProActive && proExpiryDate != null) {
+      formattedDate = DateFormat('dd.MM.yyyy').format(proExpiryDate);
+    }
+
+    return GlassmorphicContainer(
+      width: double.infinity,
+      height: 160,
+      borderRadius: 24,
+      blur: 15,
+      alignment: Alignment.center,
+      border: 1.5,
+      linearGradient: LinearGradient(
+        colors: isProActive 
+          ? [Colors.purple.shade800.withOpacity(0.6), Colors.indigo.shade900.withOpacity(0.6)]
+          : [Colors.grey.shade900.withOpacity(0.7), Colors.black.withOpacity(0.7)],
+      ),
+      borderGradient: LinearGradient(
+        colors: [Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.05)],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        isProActive ? 'PRO активна ещё $daysLeft дней' : 'Разблокируйте все возможности',
+                        style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        isProActive 
+                          ? 'Все премиум функции разблокированы.\nДействует до $formattedDate.' 
+                          : 'ИИ-тренер, аналитика и готовые программы.',
+                        style: const TextStyle(fontSize: 13, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (!isProActive) ...[
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    SoundService.playClick();
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) {
+                        return _MockPaymentBottomSheet();
+                      },
+                    );
+                  },
+                  child: const Text('Активировать PRO за 1 490 ₸', style: TextStyle(fontSize: 16, color: Colors.white)),
+                ),
+              )
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// === КЛАСС ДЛЯ ПЛАТЕЖНОЙ ШТОРКИ ===
+
+class _MockPaymentBottomSheet extends StatefulWidget {
+  @override
+  State<_MockPaymentBottomSheet> createState() => _MockPaymentBottomSheetState();
+}
+
+class _MockPaymentBottomSheetState extends State<_MockPaymentBottomSheet> {
+  bool _isLoading = false;
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade900, 
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: Colors.white10),
+        ),
+        padding: const EdgeInsets.all(24.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Оплата подписки',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Gymify PRO — 1 490 ₸ / месяц',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+
+              TextFormField(
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: _buildInputDecoration('Номер карты', CupertinoIcons.creditcard),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(16),
+                  _CardNumberFormatter(),
+                ],
+                validator: (v) => (v != null && v.length < 19) ? 'Неверный номер карты' : null,
+              ),
+              const SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _buildInputDecoration('ММ/ГГ', CupertinoIcons.calendar),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(4),
+                        _CardDateFormatter(),
+                      ],
+                      // СТРОГАЯ ВАЛИДАЦИЯ ДАТЫ
+                      validator: (v) {
+                        if (v == null || v.length < 5) return 'ММ/ГГ';
+                        final parts = v.split('/');
+                        if (parts.length != 2) return 'Ошибка';
+                        
+                        final month = int.tryParse(parts[0]);
+                        final year = int.tryParse(parts[1]);
+                        
+                        if (month == null || year == null) return 'Ошибка';
+                        if (month < 1 || month > 12) return 'Месяц (1-12)';
+                        
+                        final now = DateTime.now();
+                        final currentYear = now.year % 100; // например, 26 для 2026
+                        final currentMonth = now.month;
+
+                        if (year < currentYear) return 'Карта истекла';
+                        if (year == currentYear && month < currentMonth) return 'Карта истекла';
+                        
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      keyboardType: TextInputType.number,
+                      obscureText: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _buildInputDecoration('CVV', CupertinoIcons.lock_fill),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(3), 
+                      ],
+                      validator: (v) => (v != null && v.length < 3) ? 'Ошибка' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: _isLoading ? null : _processPayment,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Оплатить безопасно',
+                          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Демонстрационный режим оплаты. Средства не списываются.',
+                style: TextStyle(fontSize: 11, color: Colors.white38),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+      prefixIcon: Icon(icon, color: Colors.white54, size: 20),
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.05),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.blueAccent)),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.redAccent)),
+      focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.redAccent)),
+    );
+  }
+
+  void _processPayment() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Записываем покупку в Firebase Firestore!
+      final newExpiry = DateTime.now().add(const Duration(days: 30));
+      await DatabaseService().updateUserProfile({
+        'isPro': true,
+        'proExpiryDate': Timestamp.fromDate(newExpiry),
+      });
+
+      if (!mounted) return;
+      
+      Navigator.pop(context); 
+
+      HapticFeedback.vibrate();
+      SoundService.playNotify();
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: Colors.grey.shade900,
+          title: const Row(
+            children: [
+              Icon(CupertinoIcons.checkmark_circle_fill, color: Colors.green, size: 28),
+              SizedBox(width: 10),
+              Text('Оплата успешна!'),
+            ],
+          ),
+          content: const Text('Добро пожаловать в Gymify PRO. Все ограничения сняты.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Отлично', style: TextStyle(color: Colors.blueAccent)),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+}
+
+class _CardNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    var text = newValue.text;
+    if (newValue.selection.baseOffset == 0) return newValue;
+    var buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      var nonZeroIndex = i + 1;
+      if (nonZeroIndex % 4 == 0 && nonZeroIndex != text.length) {
+        buffer.write(' ');
+      }
+    }
+    var string = buffer.toString();
+    return newValue.copyWith(text: string, selection: TextSelection.collapsed(offset: string.length));
+  }
+}
+
+class _CardDateFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    var text = newValue.text;
+    if (newValue.selection.baseOffset == 0) return newValue;
+    var buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      var nonZeroIndex = i + 1;
+      if (nonZeroIndex % 2 == 0 && nonZeroIndex != text.length) {
+        buffer.write('/');
+      }
+    }
+    var string = buffer.toString();
+    return newValue.copyWith(text: string, selection: TextSelection.collapsed(offset: string.length));
   }
 }
