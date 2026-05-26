@@ -1,71 +1,95 @@
 import 'dart:convert';
 
 class ExerciseModel {
-  final String? name;
-  final String? targetMuscle;
-  final String? equipment;
-  final String? difficulty;
+  final String name;
+  final String equipment;
+  final String targetMuscle;
+  final String difficulty;
+  final String description;
+  
+  // Твои оригинальные поля (я их вернул!)
   final String? type;
   final String? gifUrl;
-  final String? description;
   final List<Map<String, double>>? sets;
+  
+  // Новые поля для персональных ИИ-тренировок
+  final String? recommendedWeight;
+  final String? recommendedReps;
+  final String? recommendedRest;
 
   ExerciseModel({
-    this.name,
-    this.targetMuscle,
-    this.equipment,
-    this.difficulty,
+    required this.name,
+    required this.equipment,
+    required this.targetMuscle,
+    required this.difficulty,
+    required this.description,
     this.type,
     this.gifUrl,
-    this.description,
     this.sets,
+    this.recommendedWeight,
+    this.recommendedReps,
+    this.recommendedRest,
   });
 
   ExerciseModel copyWith({
     String? name,
-    String? targetMuscle,
     String? equipment,
+    String? targetMuscle,
     String? difficulty,
+    String? description,
     String? type,
     String? gifUrl,
-    String? description,
     List<Map<String, double>>? sets,
+    String? recommendedWeight,
+    String? recommendedReps,
+    String? recommendedRest,
   }) {
     return ExerciseModel(
       name: name ?? this.name,
-      targetMuscle: targetMuscle ?? this.targetMuscle,
       equipment: equipment ?? this.equipment,
+      targetMuscle: targetMuscle ?? this.targetMuscle,
       difficulty: difficulty ?? this.difficulty,
+      description: description ?? this.description,
       type: type ?? this.type,
       gifUrl: gifUrl ?? this.gifUrl,
-      description: description ?? this.description,
       sets: sets ?? this.sets,
+      recommendedWeight: recommendedWeight ?? this.recommendedWeight,
+      recommendedReps: recommendedReps ?? this.recommendedReps,
+      recommendedRest: recommendedRest ?? this.recommendedRest,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
       'name': name,
-      'target_muscle': targetMuscle,
       'equipment': equipment,
+      'target_muscle': targetMuscle,
       'difficulty': difficulty,
+      'description': description,
       'type': type,
       'gif_url': gifUrl,
-      'description': description,
       'sets': sets,
+      'recommendedWeight': recommendedWeight,
+      'recommendedReps': recommendedReps,
+      'recommendedRest': recommendedRest,
     };
   }
 
   factory ExerciseModel.fromMap(Map<String, dynamic> map) {
     return ExerciseModel(
-      name: map['name'],
-      targetMuscle: map['target_muscle'],
-      equipment: map['equipment'],
-      difficulty: map['difficulty'] is int ? map['difficulty'].toString() : map['difficulty'],
+      name: map['name'] ?? '',
+      equipment: map['equipment'] ?? '',
+      targetMuscle: map['target_muscle'] ?? '',
+      difficulty: map['difficulty'] is int ? map['difficulty'].toString() : (map['difficulty'] ?? ''),
+      description: map['description'] ?? '',
       type: map['type'],
       gifUrl: map['gif_url'],
-      description: map['description'],
-      sets: map['sets'] != null ? List<Map<String, double>>.from(map['sets'].map((x) => Map<String, double>.from(x))) : null,
+      sets: map['sets'] != null 
+          ? List<Map<String, double>>.from(map['sets'].map((x) => Map<String, double>.from(x))) 
+          : null,
+      recommendedWeight: map['recommendedWeight'],
+      recommendedReps: map['recommendedReps'],
+      recommendedRest: map['recommendedRest'],
     );
   }
 
@@ -75,7 +99,7 @@ class ExerciseModel {
 
   @override
   String toString() {
-    return 'ExerciseModel(name: $name, targetMuscle: $targetMuscle, equipment: $equipment, difficulty: $difficulty, type: $type, gifUrl: $gifUrl, description: $description)';
+    return 'ExerciseModel(name: $name, equipment: $equipment, targetMuscle: $targetMuscle, difficulty: $difficulty, description: $description, type: $type, gifUrl: $gifUrl, sets: $sets, recommendedWeight: $recommendedWeight, recommendedReps: $recommendedReps, recommendedRest: $recommendedRest)';
   }
 
   @override
@@ -84,22 +108,28 @@ class ExerciseModel {
   
     return other is ExerciseModel &&
       other.name == name &&
-      other.targetMuscle == targetMuscle &&
       other.equipment == equipment &&
+      other.targetMuscle == targetMuscle &&
       other.difficulty == difficulty &&
+      other.description == description &&
       other.type == type &&
       other.gifUrl == gifUrl &&
-      other.description == description;
+      other.recommendedWeight == recommendedWeight &&
+      other.recommendedReps == recommendedReps &&
+      other.recommendedRest == recommendedRest;
   }
 
   @override
   int get hashCode {
     return name.hashCode ^
-      targetMuscle.hashCode ^
       equipment.hashCode ^
+      targetMuscle.hashCode ^
       difficulty.hashCode ^
-      type.hashCode ^
-      gifUrl.hashCode ^
-      description.hashCode;
+      description.hashCode ^
+      (type?.hashCode ?? 0) ^
+      (gifUrl?.hashCode ?? 0) ^
+      (recommendedWeight?.hashCode ?? 0) ^
+      (recommendedReps?.hashCode ?? 0) ^
+      (recommendedRest?.hashCode ?? 0);
   }
 }

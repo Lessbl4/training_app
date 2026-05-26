@@ -1,60 +1,44 @@
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-
-import 'package:training_app/core/ui_constants.dart';
 import 'package:training_app/models/exercise_model.dart';
-import 'package:training_app/presentation/widgets/gradient_card_button.dart';
-import 'package:training_app/presentation/widgets/gymify_progress_bar.dart';
-import 'package:training_app/presentation/widgets/rest_timer.dart';
-import 'package:training_app/presentation/widgets/workout_completion_overlay.dart';
-import 'package:training_app/services/database_service.dart';
-import 'package:training_app/models/workout_session_model.dart';
-
-
 import 'package:training_app/services/sound_service.dart';
-import 'package:training_app/core/localization_helper.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-
-class SetEntry {
-  final TextEditingController weightController;
-  final TextEditingController repsController;
-
-  SetEntry() : weightController = TextEditingController(), repsController = TextEditingController();
-}
-
-enum WorkoutState { waiting, inProgress, resting }
 
 class ActiveWorkoutScreen extends StatefulWidget {
+  final String title;
   final List<ExerciseModel> exercises;
-  final String workoutType;
 
-  const ActiveWorkoutScreen(
-      {super.key, required this.exercises, required this.workoutType});
+  const ActiveWorkoutScreen({super.key, required this.title, required this.exercises});
 
   @override
-  ActiveWorkoutScreenState createState() => ActiveWorkoutScreenState();
+  State<ActiveWorkoutScreen> createState() => _ActiveWorkoutScreenState();
 }
 
-class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
+class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   late PageController _pageController;
   int _currentPage = 0;
-  WorkoutState _workoutState = WorkoutState.waiting;
-  late List<List<SetEntry>> sets;
+  
+  // Хранит состояние чекбоксов: список упражнений -> список подходов
   late List<List<bool>> checkedSets;
-  late DateTime _startTime;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
-    sets = List.generate(widget.exercises.length, (index) => [SetEntry()]);
+    
+    // Инициализируем чекбоксы на основе ИИ (если ИИ сказал 3, будет 3 подхода)
     checkedSets = List.generate(
-        widget.exercises.length, (index) => List.generate(1, (i) => false));
-    _startTime = DateTime.now();
+      widget.exercises.length,
+      (index) {
+        int setsCount = 4; // по умолчанию
+        if (widget.exercises[index].recommendedReps != null) {
+          final parts = widget.exercises[index].recommendedReps!.split(' ');
+          if (parts.isNotEmpty) {
+            setsCount = int.tryParse(parts[0]) ?? 4;
+          }
+        }
+        return List.generate(setsCount, (_) => false);
+      },
+    );
   }
 
   @override
@@ -63,341 +47,166 @@ class ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     super.dispose();
   }
 
-  void _showRestTimer(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => RestTimer(
-        duration: 60,
-        onTimerEnd: () {
-          Navigator.of(context).pop();
-          SoundService.playNotify();
-        },
-        onSkip: () {
-          Navigator.of(context).pop();
-          SoundService.playNotify();
-        },
+  void _finishWorkout() {
+    SoundService.playNotify();
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Тренировка успешно завершена! Вы молодец!')),
+    );
+    Navigator.pop(context); // Возвращает обратно к плану
+  }
+
+  bool allSetsCompleted() {
+    if (checkedSets.isEmpty || _currentPage >= checkedSets.length) return false;
+    final currentExerciseSets = checkedSets[_currentPage];
+    for (int i = 0; i < currentExerciseSets.length; i++) {
+      if (!currentExerciseSets[i]) return false;
+    }
+    return currentExerciseSets.isNotEmpty;
+  }
+
+  Widget _buildAIChip(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
-    );
-  }
-
-  void _finishWorkout() async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    List<ExerciseModel> exercises = [];
-    double totalTonnage = 0;
-    bool hasCompletedSets = false;
-
-    for (int i = 0; i < widget.exercises.length; i++) {
-      List<Map<String, double>> setsList = [];
-      for (int j = 0; j < sets[i].length - 1; j++) { // minus 1 to exclude the empty set
-        if (checkedSets[i][j]) {
-          final weight = double.tryParse(sets[i][j].weightController.text) ?? 0;
-          final reps = double.tryParse(sets[i][j].repsController.text) ?? 0;
-          if (weight > 0 && reps > 0) {
-            totalTonnage += weight * reps;
-            setsList.add({"weight": weight, "reps": reps});
-            hasCompletedSets = true;
-          }
-        }
-      }
-      if (setsList.isNotEmpty) {
-        exercises.add(widget.exercises[i].copyWith(sets: setsList));
-      }
-    }
-
-    if (!hasCompletedSets) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Вы не выполнили ни одного подхода. Тренировка не будет сохранена."),
-        ),
-      );
-      return;
-    }
-
-    final durationInSeconds = DateTime.now().difference(_startTime).inSeconds;
-
-    final session = WorkoutSessionModel(
-      startTime: _startTime,
-      workoutType: widget.workoutType,
-      exercises: exercises,
-      durationInSeconds: durationInSeconds,
-      totalTonnage: totalTonnage,
-    );
-
-    try {
-      await DatabaseService().saveWorkoutSession(uid, session);
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        PageRouteBuilder(
-          opaque: false,
-          pageBuilder: (BuildContext context, _, __) {
-            return WorkoutCompletionOverlay(session: session);
-          },
-        ),
-        (route) => false,
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to save workout session: $e"),
-        ),
-      );
-    }
-  }
-
-  @override
-  Future<bool> _onWillPop() async {
-    final shouldPop = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Прервать тренировку?'),
-        content: const Text('Если вы выйдете сейчас, прогресс текущей сессии не будет сохранен.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Продолжить тренировку'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Выйти'),
-          ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
     );
-    return shouldPop ?? false;
   }
 
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) async {
-        if (didPop) {
-          return;
-        }
-        final shouldPop = await _onWillPop();
-        if (shouldPop) {
-          Navigator.of(context).pop();
-        }
-      },
-      child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Активная тренировка'),
-      ),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: widget.exercises.length,
-        onPageChanged: (int page) {
-          setState(() {
-            _currentPage = page;
-          });
-        },
-        itemBuilder: (context, index) {
-          final exercise = widget.exercises[index];
-          return _buildExercisePage(exercise);
-        },
-      ),
-    ),); // Closing PopScope and Scaffold
-  }
 
-  Widget _buildExercisePage(ExerciseModel exercise) {
-    final theme = Theme.of(context);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
+      body: Column(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exercise.name ?? 'Упражнение',
-                      style: theme.textTheme.headlineLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Icon(CupertinoIcons.flame_fill, color: theme.colorScheme.primary, size: 20),
-                        const SizedBox(width: 12),
-                        Text(
-                          exercise.targetMuscle ?? 'Целевая мышца',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Упражнение ${_currentPage + 1} из ${widget.exercises.length}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text("${((_currentPage + 1) / widget.exercises.length * 100).toInt()}%", style: TextStyle(color: theme.colorScheme.primary)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: (_currentPage + 1) / widget.exercises.length,
+                minHeight: 8,
+                backgroundColor: Colors.white10,
+                valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          ..._buildSetTrackers(),
-          const SizedBox(height: 24),
+          const SizedBox(height: 10),
+
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(), 
+              itemCount: widget.exercises.length,
+              itemBuilder: (context, index) {
+                final exercise = widget.exercises[index];
+                
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(exercise.name, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                      const SizedBox(height: 8),
+                      Text("Цель: ${exercise.targetMuscle} • Снаряд: ${exercise.equipment}", style: const TextStyle(fontSize: 16, color: Colors.grey)),
+                      const SizedBox(height: 20),
+
+                      // ИИ: ВИДЕО
+                      if (exercise.gifUrl != null)
+                        Container(
+                          height: 200,
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade900,
+                            borderRadius: BorderRadius.circular(16),
+                            image: DecorationImage(
+                              image: NetworkImage(exercise.gifUrl!),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      
+                      // ИИ: ВЕС И ПОДХОДЫ
+                      if (exercise.recommendedWeight != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildAIChip(CupertinoIcons.flame_fill, "Вес: ${exercise.recommendedWeight}", Colors.orange),
+                              _buildAIChip(CupertinoIcons.repeat, "Сеты: ${exercise.recommendedReps}", Colors.blue),
+                              _buildAIChip(CupertinoIcons.timer, "Отдых: ${exercise.recommendedRest}", Colors.green),
+                            ],
+                          ),
+                        ),
+
+                      const Text("Техника выполнения", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text(exercise.description, style: const TextStyle(fontSize: 16, color: Colors.white70, height: 1.5)),
+                      
+                      const SizedBox(height: 30),
+                      const Text("Подходы", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+
+                      ...List.generate(checkedSets[index].length, (setIndex) {
+                        return CheckboxListTile(
+                          title: Text("Подход ${setIndex + 1}", style: const TextStyle(color: Colors.white)),
+                          subtitle: Text(exercise.recommendedReps != null ? "Фокус на технику" : "Выполните на максимум", style: const TextStyle(color: Colors.white54)),
+                          value: checkedSets[index][setIndex],
+                          activeColor: theme.colorScheme.primary,
+                          checkColor: Colors.white,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              checkedSets[index][setIndex] = value ?? false;
+                            });
+                          },
+                          secondary: const Icon(CupertinoIcons.checkmark_alt_circle, color: Colors.white30),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
           _buildActionButtons(),
         ],
       ),
     );
   }
 
-  List<Widget> _buildSetTrackers() {
-    final theme = Theme.of(context);
-    return sets[_currentPage].asMap().entries.map((entry) {
-      int setIndex = entry.key;
-      SetEntry setEntry = entry.value;
-      bool isChecked = checkedSets[_currentPage][setIndex];
-
-      final weight = double.tryParse(setEntry.weightController.text) ?? 0;
-      final reps = double.tryParse(setEntry.repsController.text) ?? 0;
-
-      final isWeightFilled = setEntry.weightController.text.isNotEmpty && weight > 0;
-      final isRepsFilled = setEntry.repsController.text.isNotEmpty && reps > 0;
-
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isChecked ? theme.colorScheme.primary.withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isChecked ? theme.colorScheme.primary : Colors.grey.withOpacity(0.3),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              "Сет ${setIndex + 1}",
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: isChecked ? Colors.white : Colors.grey,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-            _buildSetTextField(setEntry.weightController, "Вес (кг)", 600, isChecked, isWeightFilled),
-            const SizedBox(width: 16),
-            _buildSetTextField(setEntry.repsController, "Повторы", 100, isChecked, isRepsFilled),
-            const SizedBox(width: 16),
-            GestureDetector(
-              onTap: () {
-                if (isChecked || !isWeightFilled || !isRepsFilled) return;
-                HapticFeedback.lightImpact();
-                SoundService.playClick();
-                setState(() {
-                  checkedSets[_currentPage][setIndex] = true;
-                  if (setIndex == sets[_currentPage].length - 1) {
-                    sets[_currentPage].add(SetEntry());
-                    checkedSets[_currentPage].add(false);
-                  }
-                  _showRestTimer(context);
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isChecked ? theme.colorScheme.primary : Colors.transparent,
-                  border: Border.all(
-                    color: isChecked
-                        ? theme.colorScheme.primary
-                        : (isWeightFilled && isRepsFilled)
-                            ? theme.colorScheme.primary
-                            : Colors.grey,
-                    width: 2,
-                  ),
-                ),
-                child: isChecked
-                    ? const Icon(Icons.check, color: Colors.white, size: 20)
-                    : null,
-              ),
-            ),
-          ],
-        ),
-      );
-    }).toList();
-  }
-
-  Widget _buildSetTextField(TextEditingController controller, String label, double maxValue, bool isChecked, bool isFilled) {
-    final theme = Theme.of(context);
-    return Container(
-      width: 65,
-      height: 45,
-      decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isFilled ? theme.colorScheme.primary : Colors.grey.withOpacity(0.3),
-          width: 1.5,
-        ),
-      ),
-      child: Center(
-        child: TextField(
-          controller: controller,
-          readOnly: isChecked,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-          decoration: InputDecoration(
-            hintText: label,
-            hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-          ),
-          keyboardType: TextInputType.number,
-          inputFormatters: <TextInputFormatter>[
-            FilteringTextInputFormatter.digitsOnly,
-            TextInputFormatter.withFunction((oldValue, newValue) {
-              if (newValue.text.isEmpty) return newValue;
-              final number = double.tryParse(newValue.text);
-              if (number != null && number > maxValue) {
-                return TextEditingValue(text: maxValue.toInt().toString());
-              }
-              return newValue;
-            }),
-          ],
-          onChanged: (value) {
-            setState(() {});
-          },
-        ),
-      ),
-    );
-  }
-
-Widget _buildActionButtons() {
+  Widget _buildActionButtons() {
     final theme = Theme.of(context);
     final isLastExercise = _currentPage == widget.exercises.length - 1;
-
-    bool allSetsCompleted() {
-      if (checkedSets.isEmpty || _currentPage >= checkedSets.length) {
-        return false;
-      }
-      final currentExerciseSets = checkedSets[_currentPage];
-      for (int i = 0; i < currentExerciseSets.length - 1; i++) {
-        if (!currentExerciseSets[i]) {
-          return false;
-        }
-      }
-      return currentExerciseSets.length > 1;
-    }
-
     final isButtonEnabled = allSetsCompleted();
 
     return SafeArea(
@@ -406,10 +215,10 @@ Widget _buildActionButtons() {
         child: GestureDetector(
           onTap: () {
             if (!isButtonEnabled) {
-              ScaffoldMessenger.of(context).removeCurrentSnackBar();
+              ScaffoldMessenger.of(context).clearSnackBars();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Выполните все подходы!'),
+                  content: Text('Отметьте все подходы для прогресса!'),
                   duration: Duration(seconds: 2),
                 ),
               );
@@ -417,19 +226,17 @@ Widget _buildActionButtons() {
               if (isLastExercise) {
                 _finishWorkout();
               } else {
-                _pageController.nextPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeIn);
+                _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn);
                 setState(() {
-                  _workoutState = WorkoutState.waiting;
+                  _currentPage++;
                 });
               }
             }
           },
           child: Opacity(
-            opacity: isButtonEnabled ? 1.0 : 0.5, // Делаем кнопку полупрозрачной, если она не активна
+            opacity: isButtonEnabled ? 1.0 : 0.5, 
             child: Container(
-              height: 56, // Фиксированная и безопасная высота для нижнего бара
+              height: 56, 
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: isLastExercise
@@ -440,7 +247,7 @@ Widget _buildActionButtons() {
                 ),
                 borderRadius: BorderRadius.circular(16.0),
                 boxShadow: [
-                  if (isButtonEnabled) // Тень только у активной кнопки
+                  if (isButtonEnabled) 
                     BoxShadow(
                       color: (isLastExercise ? theme.colorScheme.error : theme.colorScheme.primary).withOpacity(0.4),
                       blurRadius: 8,
@@ -453,17 +260,11 @@ Widget _buildActionButtons() {
                 children: [
                   Text(
                     isLastExercise ? "Завершить тренировку" : "Следующее упражнение",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                   const SizedBox(width: 8),
                   Icon(
-                    isLastExercise
-                        ? CupertinoIcons.square_arrow_down_on_square_fill
-                        : CupertinoIcons.arrow_right_circle_fill,
+                    isLastExercise ? CupertinoIcons.square_arrow_down_on_square_fill : CupertinoIcons.arrow_right_circle_fill,
                     color: Colors.white,
                   ),
                 ],

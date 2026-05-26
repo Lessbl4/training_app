@@ -1,64 +1,72 @@
 import 'package:training_app/models/user_model.dart';
 import 'package:training_app/models/exercise_model.dart';
-import 'package:training_app/data/workout_data.dart'; // Предполагается, что тут лежат StaticWorkouts
+import 'package:training_app/data/workout_data.dart';
 
 class AITrainerService {
-  
-  // Главная функция генерации
   static Map<String, dynamic> generatePlan(UserModel user) {
-    // 1. Извлекаем данные (с защитой от null)
     String goal = user.goal?.toLowerCase() ?? 'поддержание';
     String exp = user.experience?.toLowerCase() ?? 'новичок';
-    double weight = user.weight ?? 70.0;
-    double height = user.height ?? 175.0;
-
-    // 2. Логика ИИ: Определяем тип тренировки
-    bool isBeginner = exp.contains('нович') || exp.contains('beginner');
-    bool isWeightLoss = goal.contains('похуд') || goal.contains('сброс') || goal.contains('loss');
+    double bodyWeight = user.weight ?? 70.0;
     
-    String planTitle = "";
-    String planSubtitle = "";
-    List<List<ExerciseModel>> workoutDays = [];
+    bool isBeginner = exp.contains('нович') || exp.contains('beginner');
+    bool isWeightLoss = goal.contains('похуд') || goal.contains('сброс');
+    bool isMass = goal.contains('набор') || goal.contains('масс');
 
-    // МАТРИЦА РЕШЕНИЙ
-    if (isBeginner) {
-      planTitle = "Адаптационный Full-Body";
-      planSubtitle = isWeightLoss 
-          ? "Сжигание жира и тонус всех мышц" 
-          : "Базовый набор силы и массы";
-      
-      // Новичкам даем FullBody (берем из твоих статичных баз или БД)
-      // Для демо мы симулируем 3 дня Full Body разной интенсивности
-      workoutDays = [
-        StaticWorkouts.fullBodyLight,
-        StaticWorkouts.fullBodyHeavy,
-        StaticWorkouts.fullBodyLight,
-      ];
-    } else {
-      planTitle = "Прогрессивный Сплит PRO";
-      planSubtitle = isWeightLoss 
-          ? "Интенсивный рельеф и сушка" 
-          : "Максимальная гипертрофия (Набор)";
-      
-      // Опытным даем 3-дневный сплит (Тяни-Толкай-Ноги)
-      workoutDays = [
-        StaticWorkouts.splitDay1, // Грудь, Плечи, Трицепс
-        StaticWorkouts.splitDay2, // Спина, Бицепс
-        StaticWorkouts.splitDay3, // Ноги, Пресс
-      ];
+    double expMultiplier = isBeginner ? 0.35 : 0.65; 
+    double goalWeightMultiplier = isWeightLoss ? 0.75 : (isMass ? 1.05 : 0.9); 
+    
+    int sets = isWeightLoss ? 3 : 4;
+    String reps = isWeightLoss ? "15-20" : "8-12";
+    int restSeconds = isWeightLoss ? 60 : 90;
+
+    List<List<ExerciseModel>> baseDays = isBeginner 
+        ? [StaticWorkouts.fullBodyLight, StaticWorkouts.fullBodyHeavy, StaticWorkouts.fullBodyLight]
+        : [StaticWorkouts.splitDay1, StaticWorkouts.splitDay2, StaticWorkouts.splitDay3];
+
+    List<List<ExerciseModel>> customizedDays = [];
+    
+    for (var day in baseDays) {
+      List<ExerciseModel> customizedExercises = [];
+      for (var ex in day) {
+         double calcWeight = 10.0;
+         String exName = ex.name.toLowerCase();
+         
+         if (exName.contains("присед") || exName.contains("стан") || exName.contains("тяга штанги")) {
+            calcWeight = bodyWeight * expMultiplier * 1.1 * goalWeightMultiplier; 
+         } else if (exName.contains("жим лежа") || exName.contains("bench")) {
+            calcWeight = bodyWeight * expMultiplier * 0.8 * goalWeightMultiplier; 
+         } else if (exName.contains("жим") || exName.contains("тяга") || exName.contains("подтягивания")) {
+            calcWeight = bodyWeight * expMultiplier * 0.5 * goalWeightMultiplier;
+         } else if (exName.contains("сгибани") || exName.contains("разгибани") || exName.contains("махи") || exName.contains("подъем")) {
+            calcWeight = bodyWeight * expMultiplier * 0.25 * goalWeightMultiplier; 
+         } else if (exName.contains("пресс") || exName.contains("скручивания") || exName.contains("планка") || exName.contains("гиперэкстензия")) {
+            calcWeight = 0; 
+         }
+
+         calcWeight = (calcWeight / 2.5).round() * 2.5; // Округляем до 2.5 кг (блины в зале)
+         if (calcWeight < 2.5 && calcWeight > 0) calcWeight = 2.5; 
+
+         String weightStr = calcWeight > 0 ? "${calcWeight.toStringAsFixed(1).replaceAll('.0', '')} кг" : "Свой вес";
+
+         customizedExercises.add(ExerciseModel(
+            name: ex.name,
+            equipment: ex.equipment,
+            targetMuscle: ex.targetMuscle,
+            difficulty: ex.difficulty,
+            description: ex.description,
+            gifUrl: ex.gifUrl ?? "https://i.pinimg.com/originals/a4/d4/0b/a4d40b106b0d91d9ccafde6181f08e5c.gif",
+            recommendedWeight: weightStr,
+            recommendedReps: "$sets x $reps",
+            recommendedRest: "$restSeconds сек",
+         ));
+      }
+      customizedDays.add(customizedExercises);
     }
 
-    // 3. Формируем рекомендации по подходам и отдыху в зависимости от цели
-    String repsRecommendation = isWeightLoss ? "3 подхода по 15-20 повторений" : "4 подхода по 8-12 повторений";
-    String restRecommendation = isWeightLoss ? "Отдых между подходами: 60 сек" : "Отдых между подходами: 90-120 сек";
-
     return {
-      "title": planTitle,
-      "subtitle": planSubtitle,
-      "reps": repsRecommendation,
-      "rest": restRecommendation,
-      "days": workoutDays,
-      "isProPlan": true, // Флаг, что это сгенерировано ИИ
+      "title": isBeginner ? "Адаптационный Full-Body" : "Прогрессивный Сплит PRO",
+      "subtitle": isWeightLoss ? "Фокус: Сжигание жира" : "Фокус: Гипертрофия мышц",
+      "days": customizedDays,
     };
   }
 }

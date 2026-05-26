@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:glassmorphism/glassmorphism.dart';
 import 'package:training_app/presentation/screens/classic_workouts_screen.dart';
-import 'package:training_app/services/ai_loading_screen.dart'; 
+import 'package:training_app/presentation/screens/ai_loading_screen.dart'; 
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -15,7 +15,6 @@ class HomeScreen extends StatelessWidget {
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
-      // Используем ListView, чтобы на маленьких экранах ничего не "поплыло"
       body: ListView(
         padding: const EdgeInsets.all(20.0),
         children: [
@@ -40,7 +39,6 @@ class HomeScreen extends StatelessWidget {
             icon: CupertinoIcons.person_crop_circle_fill,
             colors: [Colors.orange.shade700, Colors.orange.shade900],
             onTap: () {
-              // ЗАПУСКАЕМ ЭКРАН ИИ (Дублирование убрано)
               Navigator.push(
                 context,
                 PageRouteBuilder(
@@ -61,6 +59,8 @@ class HomeScreen extends StatelessWidget {
             icon: CupertinoIcons.star_circle_fill,
             colors: [Colors.purple.shade700, Colors.purple.shade900],
             onTap: () {
+              // ИСПРАВЛЕНИЕ СПАМА:
+              ScaffoldMessenger.of(context).clearSnackBars();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Скоро: Доступ к PRO функциям!')),
               );
@@ -71,7 +71,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Вынесли дизайн кнопки в отдельный метод, чтобы не дублировать код. Это ААА-подход.
   Widget _buildHomeCard({
     required BuildContext context,
     required String title,
@@ -84,7 +83,7 @@ class HomeScreen extends StatelessWidget {
       onTap: onTap,
       child: GlassmorphicContainer(
         width: double.infinity,
-        height: 130, // Оптимальная высота для списка
+        height: 130,
         borderRadius: 24.0,
         blur: 15,
         alignment: Alignment.center,
@@ -120,19 +119,12 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: const TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
+                      style: const TextStyle(fontSize: 14, color: Colors.white70),
                     ),
                   ],
                 ),
