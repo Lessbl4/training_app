@@ -31,12 +31,18 @@ class SplitWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.splitDay1, workoutType: 'split_day_1'),
+                    // ИСПРАВЛЕНО: удален workoutType, добавлен title
+                    builder: (context) => ActiveWorkoutScreen(
+                      title: 'Сплит: День 1',
+                      exercises: StaticWorkouts.splitDay1,
+                    ),
                   ),
                 );
               },
             ).animate().fadeIn(duration: 600.ms, curve: Curves.easeOut).slideY(),
+            
             const SizedBox(height: UIConstants.padding24),
+            
             GradientCardButton(
               title: "День 2",
               subtitle: "Спина, Бицепс",
@@ -50,12 +56,18 @@ class SplitWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.splitDay2, workoutType: 'split_day_2'),
+                    // ИСПРАВЛЕНО: удален workoutType, добавлен title
+                    builder: (context) => ActiveWorkoutScreen(
+                      title: 'Сплит: День 2',
+                      exercises: StaticWorkouts.splitDay2,
+                    ),
                   ),
                 );
               },
             ).animate().fadeIn(duration: 600.ms, delay: 200.ms, curve: Curves.easeOut).slideY(),
+            
             const SizedBox(height: UIConstants.padding24),
+            
             GradientCardButton(
               title: "День 3",
               subtitle: "Ноги, Пресс",
@@ -69,7 +81,11 @@ class SplitWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.splitDay3, workoutType: 'split_day_3'),
+                    // ИСПРАВЛЕНО: удален workoutType, добавлен title
+                    builder: (context) => ActiveWorkoutScreen(
+                      title: 'Сплит: День 3',
+                      exercises: StaticWorkouts.splitDay3,
+                    ),
                   ),
                 );
               },
@@ -79,6 +95,4 @@ class SplitWorkoutScreen extends StatelessWidget {
       ),
     );
   }
-
-
 }

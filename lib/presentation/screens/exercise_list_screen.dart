@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:training_app/models/exercise_model.dart';
 import 'package:training_app/services/database_service.dart';
 import 'package:training_app/core/ui_constants.dart';
 import 'package:training_app/presentation/screens/active_workout_screen.dart';
+import 'package:training_app/presentation/widgets/gradient_card_button.dart';
 
 class ExerciseListScreen extends StatefulWidget {
   final String workoutType;
@@ -65,16 +67,24 @@ class ExerciseListScreenState extends State<ExerciseListScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.all(UIConstants.padding16),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ActiveWorkoutScreen(exercises: exercises, workoutType: widget.workoutType),
-                      ),
-                    );
-                  },
-                  child: const Text("Начать тренировку"),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          // ИСПРАВЛЕНО: передаем только нужные параметры
+                          builder: (context) => ActiveWorkoutScreen(
+                            title: widget.workoutType, 
+                            exercises: exercises,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text("Начать тренировку"),
+                  ),
                 ),
               )
             ],
@@ -85,43 +95,17 @@ class ExerciseListScreenState extends State<ExerciseListScreen> {
   }
 
   Widget _buildExerciseCard(ExerciseModel exercise) {
-    return Card(
-      margin: const EdgeInsets.symmetric(
-        horizontal: UIConstants.padding16,
-        vertical: UIConstants.padding8,
-      ),
-      color: UIColors.secondary,
-      shape: const RoundedRectangleBorder(borderRadius: UIConstants.borderRadius12),
-      child: Padding(
-        padding: const EdgeInsets.all(UIConstants.padding16),
-        child: Row(
-          children: [
-            // Иконка оборудования
-            Image.network(
-              exercise.gifUrl ?? '', // Используем gifUrl как иконку
-              width: 50,
-              height: 50,
-              errorBuilder: (context, error, stackTrace) => const Icon(Icons.fitness_center, size: 40, color: UIColors.white),
-            ),
-            const SizedBox(width: UIConstants.padding16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    exercise.name ?? '',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: UIColors.white),
-                  ),
-                  const SizedBox(height: UIConstants.padding4),
-                  Text(
-                    'Целевая мышца: ${exercise.targetMuscle ?? ''}',
-                    style: const TextStyle(fontSize: 14, color: UIColors.lightGrey),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: UIConstants.padding16, vertical: UIConstants.padding8),
+      child: GradientCardButton(
+        // ИСПРАВЛЕНО: используем только существующие параметры
+        title: exercise.name,
+        subtitle: 'Цель: ${exercise.targetMuscle}',
+        icon: CupertinoIcons.flame_fill,
+        gradient: LinearGradient(colors: [Colors.blue.shade600, Colors.blue.shade900]),
+        onPressed: () {
+          // Действие при клике на упражнение, если нужно
+        },
       ),
     );
   }

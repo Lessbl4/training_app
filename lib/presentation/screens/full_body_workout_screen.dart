@@ -31,12 +31,18 @@ class FullBodyWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.fullBodyLight, workoutType: 'full_body_light'),
+                    // ИСПРАВЛЕНО: передаем только title и exercises
+                    builder: (context) => ActiveWorkoutScreen(
+                      title: 'Легкая Full Body',
+                      exercises: StaticWorkouts.fullBodyLight,
+                    ),
                   ),
                 );
               },
             ).animate().fadeIn(duration: 600.ms, curve: Curves.easeOut).slideY(),
+            
             const SizedBox(height: UIConstants.padding24),
+            
             GradientCardButton(
               title: "Тяжелая",
               subtitle: "Для опытных атлетов",
@@ -50,7 +56,11 @@ class FullBodyWorkoutScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ActiveWorkoutScreen(exercises: StaticWorkouts.fullBodyHeavy, workoutType: 'full_body_heavy'),
+                    // ИСПРАВЛЕНО: передаем только title и exercises
+                    builder: (context) => ActiveWorkoutScreen(
+                      title: 'Тяжелая Full Body',
+                      exercises: StaticWorkouts.fullBodyHeavy,
+                    ),
                   ),
                 );
               },
@@ -60,6 +70,4 @@ class FullBodyWorkoutScreen extends StatelessWidget {
       ),
     );
   }
-
-
 }
