@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:glassmorphism/glassmorphism.dart';
 import 'package:training_app/presentation/screens/classic_workouts_screen.dart';
-import 'package:training_app/presentation/screens/ai_loading_screen.dart'; // ДОБАВЛЕН ИМПОРТ НОВОГО ЭКРАНА
+import 'package:training_app/services/ai_loading_screen.dart'; 
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
