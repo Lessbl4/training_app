@@ -8,7 +8,7 @@ class AITrainerService {
     String exp = user.experience?.toLowerCase() ?? 'новичок';
     double bodyWeight = user.weight ?? 70.0;
     
-    bool isBeginner = exp.contains('нович') || exp.contains('beginner');
+    bool isBeginner = exp.contains('нович') || exp.contains('begin');
     bool isWeightLoss = goal.contains('похуд') || goal.contains('сброс');
     bool isMass = goal.contains('набор') || goal.contains('масс');
 
@@ -43,21 +43,17 @@ class AITrainerService {
             calcWeight = 0; 
          }
 
-         calcWeight = (calcWeight / 2.5).round() * 2.5; // Округляем до 2.5 кг (блины в зале)
+         calcWeight = (calcWeight / 2.5).round() * 2.5; 
          if (calcWeight < 2.5 && calcWeight > 0) calcWeight = 2.5; 
 
          String weightStr = calcWeight > 0 ? "${calcWeight.toStringAsFixed(1).replaceAll('.0', '')} кг" : "Свой вес";
 
-         customizedExercises.add(ExerciseModel(
-            name: ex.name,
-            equipment: ex.equipment,
-            targetMuscle: ex.targetMuscle,
-            difficulty: ex.difficulty,
-            description: ex.description,
-            gifUrl: ex.gifUrl ?? "https://i.pinimg.com/originals/a4/d4/0b/a4d40b106b0d91d9ccafde6181f08e5c.gif",
+         // ИСПОЛЬЗУЕМ COPYWITH, ЧТОБЫ СОХРАНИТЬ ВСЕ ТВОИ ПОЛЯ (TYPE, SETS И ДР.)
+         customizedExercises.add(ex.copyWith(
             recommendedWeight: weightStr,
             recommendedReps: "$sets x $reps",
             recommendedRest: "$restSeconds сек",
+            gifUrl: ex.gifUrl ?? "https://i.pinimg.com/originals/a4/d4/0b/a4d40b106b0d91d9ccafde6181f08e5c.gif",
          ));
       }
       customizedDays.add(customizedExercises);
