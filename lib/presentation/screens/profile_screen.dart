@@ -20,6 +20,7 @@ import 'package:training_app/services/sound_service.dart';
 import 'package:training_app/models/user_model.dart';
 import 'package:training_app/services/database_service.dart';
 import 'package:training_app/presentation/widgets/profile/bmi_card.dart';
+import 'package:training_app/presentation/screens/progress_update_screen.dart'; // ИМПОРТ ЭКРАНА ОБНОВЛЕНИЯ
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -117,13 +118,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ? 0
                 : DateTime.now().difference(user.dateOfBirth!).inDays ~/ 365;
 
-            // Логика проверки подписки из Базы Данных
             bool isProActive = user.isPro;
             int daysLeft = 0;
             
             if (isProActive && user.proExpiryDate != null) {
               daysLeft = user.proExpiryDate!.difference(DateTime.now()).inDays;
-              // Если дни ушли в минус, подписка истекла (можно дополнительно триггерить обнуление в БД)
               if (daysLeft < 0) {
                 isProActive = false;
                 daysLeft = 0;
@@ -179,7 +178,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                               style: theme.textTheme.headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
-                          // БЕЙДЖ ПОДПИСКИ
                           isProActive ? _buildProBadge(daysLeft) : _buildFreeBadge(),
                         ],
                       ),
@@ -216,7 +214,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                     BmiCard(height: heightValue, weight: weightValue),
                     const SizedBox(height: 24),
                     
-                    // КАРТОЧКА ПОДПИСКИ
                     _buildSubscriptionCard(context, isProActive, daysLeft, user.proExpiryDate),
                     const SizedBox(height: 30),
 
@@ -230,6 +227,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                     ),
                     const SizedBox(height: 10),
+                    
+                    // ДОБАВЛЕННАЯ КНОПКА ОБНОВЛЕНИЯ
+                    _settingTile("Обновить показатели (Прогресс)", CupertinoIcons.graph_circle, () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProgressUpdateScreen(currentWeight: weightValue),
+                        ),
+                      );
+                    }),
+                    
                     _settingTile("Изменить имя", CupertinoIcons.person, () {
                       showGlassmorphicModal(
                         context: context,
@@ -496,8 +504,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // === МЕТОДЫ ПОДПИСКИ ===
-
   Widget _buildFreeBadge() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -622,8 +628,6 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 }
 
-// === КЛАСС ДЛЯ ПЛАТЕЖНОЙ ШТОРКИ ===
-
 class _MockPaymentBottomSheet extends StatefulWidget {
   @override
   State<_MockPaymentBottomSheet> createState() => _MockPaymentBottomSheetState();
@@ -696,7 +700,6 @@ class _MockPaymentBottomSheetState extends State<_MockPaymentBottomSheet> {
                         LengthLimitingTextInputFormatter(4),
                         _CardDateFormatter(),
                       ],
-                      // СТРОГАЯ ВАЛИДАЦИЯ ДАТЫ
                       validator: (v) {
                         if (v == null || v.length < 5) return 'ММ/ГГ';
                         final parts = v.split('/');
@@ -709,7 +712,7 @@ class _MockPaymentBottomSheetState extends State<_MockPaymentBottomSheet> {
                         if (month < 1 || month > 12) return 'Месяц (1-12)';
                         
                         final now = DateTime.now();
-                        final currentYear = now.year % 100; // например, 26 для 2026
+                        final currentYear = now.year % 100;
                         final currentMonth = now.month;
 
                         if (year < currentYear) return 'Карта истекла';
@@ -788,7 +791,6 @@ class _MockPaymentBottomSheetState extends State<_MockPaymentBottomSheet> {
 
       await Future.delayed(const Duration(seconds: 2));
 
-      // Записываем покупку в Firebase Firestore!
       final newExpiry = DateTime.now().add(const Duration(days: 30));
       await DatabaseService().updateUserProfile({
         'isPro': true,

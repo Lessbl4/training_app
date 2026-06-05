@@ -1,10 +1,10 @@
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:training_app/presentation/theme/ui_constants.dart';
 import 'package:training_app/presentation/widgets/custom_error_dialog.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:training_app/presentation/widgets/google_auth_button.dart'; // Импорт кнопки Google
 
 class RegisterForm extends StatefulWidget {
   const RegisterForm({super.key, required this.onSwitchMode});
@@ -226,6 +226,11 @@ class _RegisterFormState extends State<RegisterForm> {
                               ),
                             ),
                           ),
+                    const SizedBox(height: 16),
+                    
+                    // ДОБАВЛЕНА КНОПКА GOOGLE
+                    const GoogleAuthButton(),
+                    
                     const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,

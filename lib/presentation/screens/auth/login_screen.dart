@@ -1,10 +1,11 @@
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:training_app/presentation/theme/ui_constants.dart';
 import 'package:training_app/presentation/widgets/custom_error_dialog.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// ИМПОРТ НАШЕЙ НОВОЙ КНОПКИ GOOGLE
+import 'package:training_app/presentation/widgets/google_auth_button.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key, required this.onSwitchMode});
@@ -67,7 +68,7 @@ class _LoginFormState extends State<LoginForm> {
       return;
     }
 
-    Navigator.of(context).pop();
+    
   }
 
   Future<void> resetPassword() async {
@@ -231,9 +232,16 @@ class _LoginFormState extends State<LoginForm> {
                               child: const Text(
                                 "Войти",
                                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                
                               ),
                             ),
                           ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // ДОБАВЛЕНА КНОПКА ВХОДА ЧЕРЕЗ GOOGLE
+                    const GoogleAuthButton(),
+                          
                     const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
