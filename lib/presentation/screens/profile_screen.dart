@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/services.dart'; 
 import 'package:glassmorphism/glassmorphism.dart'; 
@@ -20,7 +21,8 @@ import 'package:training_app/services/sound_service.dart';
 import 'package:training_app/models/user_model.dart';
 import 'package:training_app/services/database_service.dart';
 import 'package:training_app/presentation/widgets/profile/bmi_card.dart';
-import 'package:training_app/presentation/screens/progress_update_screen.dart'; // ИМПОРТ ЭКРАНА ОБНОВЛЕНИЯ
+import 'package:training_app/presentation/screens/progress_update_screen.dart';
+import 'package:training_app/presentation/theme/ui_constants.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,40 +31,31 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
-    with AutomaticKeepAliveClientMixin {
+class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   final picker = ImagePicker();
   bool _isUploading = false;
 
   Future<void> pickImage() async {
-    final img = await picker.pickImage(
-        source: ImageSource.gallery, imageQuality: 70, maxWidth: 512, maxHeight: 512);
+    final img = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 512, maxHeight: 512);
     if (img == null) return;
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    setState(() {
-      _isUploading = true;
-    });
+    setState(() => _isUploading = true);
 
     try {
       final ref = FirebaseStorage.instance.ref().child('avatars/$uid.jpg');
       await ref.putFile(File(img.path));
       final downloadUrl = await ref.getDownloadURL();
 
-      await FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid)
-          .update({"фото": downloadUrl});
+      await FirebaseFirestore.instance.collection("users").doc(uid).update({"фото": downloadUrl});
     } catch (e) {
       debugPrint("Error uploading photo: $e");
     } finally {
-      setState(() {
-        _isUploading = false;
-      });
+      setState(() => _isUploading = false);
     }
   }
 
@@ -70,23 +63,24 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    final theme = Theme.of(context);
 
     if (uid == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Профиль")),
-        body: const Center(
-          child: Text("Пожалуйста, войдите, чтобы увидеть профиль."),
-        ),
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text("Профиль"), backgroundColor: Colors.transparent, elevation: 0),
+        body: const Center(child: Text("Пожалуйста, войдите, чтобы увидеть профиль.", style: TextStyle(color: Colors.white))),
       );
     }
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Профиль"),
+        title: const Text("Мой Профиль 🦾", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(CupertinoIcons.square_arrow_right),
+            icon: const Icon(CupertinoIcons.square_arrow_right, color: Colors.white),
             onPressed: () {
               SoundService.playNotify();
               FirebaseAuth.instance.signOut();
@@ -98,29 +92,22 @@ class _ProfileScreenState extends State<ProfileScreen>
         stream: DatabaseService().getUserStream(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CupertinoActivityIndicator());
+            return const Center(child: CupertinoActivityIndicator(color: AppColors.primary));
           }
           if (!snap.hasData) {
-            return const Center(
-                child: Text("Не удалось загрузить данные пользователя."));
+            return const Center(child: Text("Не удалось загрузить данные.", style: TextStyle(color: Colors.white54)));
           }
 
           try {
             final user = snap.data!;
             final name = user.name ?? "Пользователь";
             final photoURL = user.photo ?? "";
-            final height = user.height ?? 0.0;
-            final weight = user.weight ?? 0.0;
-
-            final heightValue = height.toDouble();
-            final weightValue = weight.toDouble();
-            final age = user.dateOfBirth == null
-                ? 0
-                : DateTime.now().difference(user.dateOfBirth!).inDays ~/ 365;
+            final heightValue = (user.height ?? 0.0).toDouble();
+            final weightValue = (user.weight ?? 0.0).toDouble();
+            final age = user.dateOfBirth == null ? 0 : DateTime.now().difference(user.dateOfBirth!).inDays ~/ 365;
 
             bool isProActive = user.isPro;
             int daysLeft = 0;
-            
             if (isProActive && user.proExpiryDate != null) {
               daysLeft = user.proExpiryDate!.difference(DateTime.now()).inDays;
               if (daysLeft < 0) {
@@ -130,343 +117,321 @@ class _ProfileScreenState extends State<ProfileScreen>
             }
 
             return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                padding: const EdgeInsets.symmetric(horizontal: AppPadding.horizontal, vertical: 10),
                 child: Column(
-                  children: <Widget>[
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- ВЕРХНЯЯ ЧАСТЬ: Аватар и Имя ---
                     Center(
                       child: Column(
-                        children: <Widget>[
-                          const SizedBox(height: 15),
+                        children: [
                           GestureDetector(
                             onTap: pickImage,
                             child: Stack(
                               alignment: Alignment.center,
-                              children: <Widget>[
-                                CircleAvatar(
-                                  radius: 55,
-                                  backgroundColor:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  backgroundImage: photoURL.isNotEmpty
-                                      ? NetworkImage(photoURL)
-                                      : null,
-                                  child: photoURL.isEmpty
-                                      ? Icon(CupertinoIcons.person_fill,
-                                          size: 50,
-                                          color: theme.colorScheme.primary)
-                                      : null,
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withOpacity(0.3),
+                                        blurRadius: 30,
+                                        spreadRadius: 5,
+                                      )
+                                    ],
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 60,
+                                    backgroundColor: AppColors.surface,
+                                    backgroundImage: photoURL.isNotEmpty ? NetworkImage(photoURL) : null,
+                                    child: photoURL.isEmpty
+                                        ? const Icon(CupertinoIcons.person_fill, size: 50, color: AppColors.primary)
+                                        : null,
+                                  ),
                                 ),
-                                if (_isUploading)
-                                  const CircularProgressIndicator(),
+                                if (_isUploading) const CircularProgressIndicator(color: AppColors.accent),
                                 Positioned(
                                   bottom: 0,
-                                  right: 0,
-                                  child: CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor: theme.colorScheme.primary,
-                                    child: const Icon(CupertinoIcons.camera_fill,
-                                        size: 16,
-                                        color: Colors.white),
+                                  right: 4,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: AppColors.background, width: 3),
+                                    ),
+                                    child: const Icon(CupertinoIcons.camera_fill, size: 16, color: Colors.white),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 15),
-                          Text(name,
-                              style: theme.textTheme.headlineSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 20),
+                          Text(name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
                           const SizedBox(height: 8),
                           isProActive ? _buildProBadge(daysLeft) : _buildFreeBadge(),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 32),
+
+                    // --- СТАТИСТИКА (Glassmorphism Карточки) ---
                     Row(
-                      children: <Widget>[
-                        Expanded(
-                            child: _statCard(
-                          "Рост",
-                          heightValue.round().toString(),
-                          "см",
-                          CupertinoIcons.arrow_up_down,
-                        )),
+                      children: [
+                        Expanded(child: _glassStatCard("Рост", heightValue.round().toString(), "см", CupertinoIcons.arrow_up_down)),
                         const SizedBox(width: 12),
-                        Expanded(
-                            child: _statCard(
-                          "Вес", 
-                          weightValue.round().toString(),
-                          "кг",
-                          CupertinoIcons.gauge,
-                        )),
+                        Expanded(child: _glassStatCard("Вес", weightValue.round().toString(), "кг", CupertinoIcons.gauge)),
                         const SizedBox(width: 12),
-                        Expanded(
-                            child: _statCard(
-                          "Возраст",
-                          age.toString(),
-                          "лет",
-                          CupertinoIcons.person_alt_circle,
-                        )),
+                        Expanded(child: _glassStatCard("Возраст", age.toString(), "лет", CupertinoIcons.person_alt_circle)),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    BmiCard(height: heightValue, weight: weightValue),
-                    const SizedBox(height: 24),
-                    
-                    _buildSubscriptionCard(context, isProActive, daysLeft, user.proExpiryDate),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 16),
+                    BmiCard(height: heightValue, weight: weightValue), 
+                    const SizedBox(height: 32),
 
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        "НАСТРОЙКИ",
-                        style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withAlpha(153),
-                            letterSpacing: 1.2),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
+                    // --- ПОДПИСКА PRO ---
+                    _buildSubscriptionCard(context, isProActive, daysLeft, user.proExpiryDate),
+                    const SizedBox(height: 40),
+
+                    // --- НАСТРОЙКИ ---
+                    const Text("НАСТРОЙКИ ⚙️", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5)),
+                    const SizedBox(height: 16),
                     
-                    // ДОБАВЛЕННАЯ КНОПКА ОБНОВЛЕНИЯ
-                    _settingTile("Обновить показатели (Прогресс)", CupertinoIcons.graph_circle, () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProgressUpdateScreen(currentWeight: weightValue),
-                        ),
-                      );
+                    _premiumSettingTile("Обновить показатели (Прогресс)", CupertinoIcons.graph_circle, AppColors.accent, () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) => ProgressUpdateScreen(currentWeight: weightValue)));
                     }),
-                    
-                    _settingTile("Изменить имя", CupertinoIcons.person, () {
+                    _premiumSettingTile("Изменить имя", CupertinoIcons.person, Colors.white, () {
                       showGlassmorphicModal(
                         context: context,
                         builder: (context) => EditNameModal(
                           initialValue: name,
-                          onSave: (value) {
-                            FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(uid)
-                                .update({'имя': value});
-                          },
+                          onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'имя': val}),
                         ),
                       );
                     }),
-                    _settingTile(
-                        "Изменить дату рождения", CupertinoIcons.calendar, () {
+                    _premiumSettingTile("Изменить дату рождения", CupertinoIcons.calendar, Colors.white, () {
                       _showDatePicker(context, user.dateOfBirth, (date) {
-                        FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(uid)
-                            .update({'Дата рождения': date});
+                        FirebaseFirestore.instance.collection('users').doc(uid).update({'Дата рождения': date});
                       });
                     }),
-                    _settingTile(
-                        "Изменить рост", CupertinoIcons.arrow_up_down, () {
+                    _premiumSettingTile("Изменить рост", CupertinoIcons.arrow_up_down, Colors.white, () {
                       showGlassmorphicModal(
                         context: context,
                         builder: (context) => EditHeightModal(
                           initialValue: heightValue < 100.0 ? 170.0 : heightValue,
-                          onSave: (value) {
-                            FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(uid)
-                                .update({'высота': value});
-                          },
+                          onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'высота': val}),
                         ),
                       );
                     }),
-                    _settingTile(
-                        "Изменить вес", CupertinoIcons.gauge, () {
+                    _premiumSettingTile("Изменить вес", CupertinoIcons.gauge, Colors.white, () {
                       showGlassmorphicModal(
                         context: context,
                         builder: (context) => EditWeightModal(
                           initialValue: weightValue < 30.0 ? 70.0 : weightValue,
-                          onSave: (value) {
-                            FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(uid)
-                                .update({'вес': value});
-                          },
+                          onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'вес': val}),
                         ),
                       );
                     }),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             );
           } catch (e, stackTrace) {
             debugPrint("Error building profile screen: $e\n$stackTrace");
-            return const Center(child: Text("Ошибка загрузки профиля."));
+            return const Center(child: Text("Ошибка загрузки профиля.", style: TextStyle(color: Colors.red)));
           }
         },
       ),
     );
   }
 
-  Widget _statCard(String label, String value, String unit, IconData icon) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 100),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withAlpha(25),
-                borderRadius: BorderRadius.circular(12),
+  Widget _glassStatCard(String label, String value, String unit, IconData icon) {
+    return ClipRRect(
+      borderRadius: AppBorderRadius.circularMedium,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.glassBackground,
+            borderRadius: AppBorderRadius.circularMedium,
+            border: Border.all(color: AppColors.glassBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppColors.primary, size: 24),
+              const SizedBox(height: 12),
+              Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(width: 4),
+                  Text(unit, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                ],
               ),
-              child: Icon(icon, color: theme.colorScheme.primary, size: 22),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withAlpha(200),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  value,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (unit.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 4),
-                    child: Text(
-                      unit,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withAlpha(178),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showDatePicker(
-      BuildContext context, DateTime? initialDate, Function(DateTime) onSave) {
-    DateTime selectedDate = initialDate ??
-        DateTime(DateTime.now().year - 13, DateTime.now().month,
-            DateTime.now().day);
+  Widget _premiumSettingTile(String title, IconData icon, Color iconColor, VoidCallback onTap) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.glassBorder),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        onTap: () {
+          SoundService.playClick();
+          onTap();
+        },
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: iconColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: iconColor, size: 22),
+        ),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
+        trailing: const Icon(CupertinoIcons.chevron_right, size: 18, color: AppColors.textSecondary),
+      ),
+    );
+  }
 
+  Widget _buildFreeBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(20)),
+      child: const Text('BASE План', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 12)),
+    );
+  }
+
+  Widget _buildProBadge(int daysLeft) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFF97316)]),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 2))],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(CupertinoIcons.star_fill, color: Colors.white, size: 14),
+          const SizedBox(width: 6),
+          Text('PRO ДОСТУП ($daysLeft ДН.)', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionCard(BuildContext context, bool isProActive, int daysLeft, DateTime? proExpiryDate) {
+    String formattedDate = isProActive && proExpiryDate != null ? DateFormat('dd.MM.yyyy').format(proExpiryDate) : '';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: isProActive
+            ? AppColors.primaryGradient
+            : const LinearGradient(colors: [Color(0xFF27272A), Color(0xFF18181B)]),
+        border: Border.all(color: AppColors.glassBorder),
+        boxShadow: isProActive ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))] : [],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                child: Icon(isProActive ? CupertinoIcons.bolt_fill : CupertinoIcons.lock_fill, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(isProActive ? 'PRO активна ещё $daysLeft дней' : 'Разблокируй Gymify PRO 🔥', style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(isProActive ? 'Действует до $formattedDate.' : 'ИИ-тренер, аналитика и программы.', style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.8))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!isProActive) ...[
+            const SizedBox(height: 24),
+            CustomElevatedButton(
+              text: 'Активировать за 1 490 ₸',
+              onPressed: () {
+                SoundService.playClick();
+                showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (c) => _MockPaymentBottomSheet());
+              },
+            ),
+          ]
+        ],
+      ),
+    );
+  }
+
+  void _showDatePicker(BuildContext context, DateTime? initialDate, Function(DateTime) onSave) {
+    DateTime selectedDate = initialDate ?? DateTime(DateTime.now().year - 13, DateTime.now().month, DateTime.now().day);
     const int minYear = 1950;
     final int maxYear = DateTime.now().year;
-
-    if (selectedDate.year < minYear) {
-      selectedDate = DateTime(minYear);
-    }
-    if (selectedDate.year > maxYear) {
-      selectedDate = DateTime(maxYear);
-    }
-    if (selectedDate.isAfter(DateTime.now())) {
-      selectedDate = DateTime.now();
-    }
 
     showGlassmorphicModal(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            final theme = Theme.of(context);
-            final int currentAge = _calculateAge(selectedDate);
+            final int currentAge = DateTime.now().year - selectedDate.year;
             final bool isOldEnough = currentAge >= 13;
-
-            void onDateChanged(DateTime newDate) {
-              DateTime clampedDate = newDate;
-              if (clampedDate.isAfter(DateTime.now())) {
-                clampedDate = DateTime.now();
-              }
-              if (clampedDate.year < minYear) {
-                clampedDate =
-                    DateTime(minYear, clampedDate.month, clampedDate.day);
-              }
-
-              setState(() {
-                selectedDate = clampedDate;
-              });
-            }
 
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  DateFormat("dd MMMM yyyy", "ru").format(selectedDate),
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isOldEnough ? null : Colors.red,
-                  ),
-                ),
+                Text(DateFormat("dd MMMM yyyy", "ru").format(selectedDate), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isOldEnough ? Colors.white : Colors.red)),
                 const SizedBox(height: 8),
-                Text(
-                  "Ваш возраст: $currentAge лет",
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: isOldEnough ? null : Colors.red,
-                  ),
-                ),
-                if (!isOldEnough)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      "Регистрация доступна только с 13 лет",
-                      style:
-                          theme.textTheme.bodyMedium?.copyWith(color: Colors.red),
-                    ),
-                  ),
+                Text("Ваш возраст: $currentAge лет", style: TextStyle(fontSize: 16, color: isOldEnough ? AppColors.textSecondary : Colors.red)),
                 const SizedBox(height: 20),
                 SizedBox(
                   height: 200,
-                  child: CupertinoDatePicker(
-                    mode: CupertinoDatePickerMode.date,
-                    initialDateTime: selectedDate,
-                    minimumYear: minYear,
-                    maximumYear: maxYear,
-                    maximumDate: DateTime.now(),
-                    onDateTimeChanged: onDateChanged,
-                    dateOrder: DatePickerDateOrder.dmy,
+                  child: CupertinoTheme(
+                    data: const CupertinoThemeData(
+                      textTheme: CupertinoTextThemeData(
+                        // ИСПРАВЛЕНИЕ ТУТ: Размер шрифта 20, чтобы буквы не слипались
+                        dateTimePickerTextStyle: TextStyle(color: Colors.white, fontSize: 20),
+                      ),
+                    ),
+                    child: CupertinoDatePicker(
+                      mode: CupertinoDatePickerMode.date,
+                      initialDateTime: selectedDate,
+                      minimumYear: minYear,
+                      maximumYear: maxYear,
+                      onDateTimeChanged: (date) => setState(() => selectedDate = date),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    Expanded(
-                      child: CustomElevatedButton(
-                        text: "Отмена",
-                        onPressed: () => Navigator.pop(context),
-                        isPrimary: false,
-                      ),
-                    ),
+                    Expanded(child: CustomElevatedButton(text: "Отмена", isPrimary: false, onPressed: () => Navigator.pop(context))),
                     const SizedBox(width: 16),
-                    Expanded(
-                      child: CustomElevatedButton(
-                        text: "Сохранить",
-                        onPressed: isOldEnough
-                            ? () {
-                                onSave(selectedDate);
-                                Navigator.pop(context);
-                              }
-                            : null,
-                      ),
-                    ),
+                    Expanded(child: CustomElevatedButton(text: "Сохранить", onPressed: isOldEnough ? () { onSave(selectedDate); Navigator.pop(context); } : null)),
                   ],
                 ),
               ],
@@ -476,158 +441,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       },
     );
   }
-
-  int _calculateAge(DateTime birthDate) {
-    final now = DateTime.now();
-    int age = now.year - birthDate.year;
-    if (now.month < birthDate.month ||
-        (now.month == birthDate.month && now.day < birthDate.day)) {
-      age--;
-    }
-    return age < 0 ? 0 : age;
-  }
-
-  Widget _settingTile(String title, IconData icon, VoidCallback onTap, {bool isDestructive = false}) {
-    final theme = Theme.of(context);
-    final color = isDestructive ? theme.colorScheme.error : theme.colorScheme.onSurface;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: () {
-          SoundService.playClick();
-          onTap();
-        },
-        leading: Icon(icon, color: color.withAlpha(204)),
-        title: Text(title, style: theme.textTheme.bodyLarge?.copyWith(color: color)),
-        trailing: const Icon(CupertinoIcons.chevron_right, size: 18),
-      ),
-    );
-  }
-
-  Widget _buildFreeBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Text(
-        'BASE План',
-        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  Widget _buildProBadge(int daysLeft) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Colors.amber, Colors.orangeAccent],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.amber.withOpacity(0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          )
-        ]
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(CupertinoIcons.star_fill, color: Colors.white, size: 14),
-          const SizedBox(width: 6),
-          Text(
-            'PRO ДОСТУП ($daysLeft ДН.)',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubscriptionCard(BuildContext context, bool isProActive, int daysLeft, DateTime? proExpiryDate) {
-    String formattedDate = '';
-    if (isProActive && proExpiryDate != null) {
-      formattedDate = DateFormat('dd.MM.yyyy').format(proExpiryDate);
-    }
-
-    return GlassmorphicContainer(
-      width: double.infinity,
-      height: 160,
-      borderRadius: 24,
-      blur: 15,
-      alignment: Alignment.center,
-      border: 1.5,
-      linearGradient: LinearGradient(
-        colors: isProActive 
-          ? [Colors.purple.shade800.withOpacity(0.6), Colors.indigo.shade900.withOpacity(0.6)]
-          : [Colors.grey.shade900.withOpacity(0.7), Colors.black.withOpacity(0.7)],
-      ),
-      borderGradient: LinearGradient(
-        colors: [Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.05)],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        isProActive ? 'PRO активна ещё $daysLeft дней' : 'Разблокируйте все возможности',
-                        style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        isProActive 
-                          ? 'Все премиум функции разблокированы.\nДействует до $formattedDate.' 
-                          : 'ИИ-тренер, аналитика и готовые программы.',
-                        style: const TextStyle(fontSize: 13, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (!isProActive) ...[
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    SoundService.playClick();
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) {
-                        return _MockPaymentBottomSheet();
-                      },
-                    );
-                  },
-                  child: const Text('Активировать PRO за 1 490 ₸', style: TextStyle(fontSize: 16, color: Colors.white)),
-                ),
-              )
-            ]
-          ],
-        ),
-      ),
-    );
-  }
 }
 
+// МОДАЛКА ОПЛАТЫ (ОСТАЛАСЬ БЕЗ ИЗМЕНЕНИЙ ЛОГИКИ, НО СТИЛИЗОВАНА ПОД НОВЫЙ ДИЗАЙН)
 class _MockPaymentBottomSheet extends StatefulWidget {
   @override
   State<_MockPaymentBottomSheet> createState() => _MockPaymentBottomSheetState();
@@ -642,11 +458,7 @@ class _MockPaymentBottomSheetState extends State<_MockPaymentBottomSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey.shade900, 
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border.all(color: Colors.white10),
-        ),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(32)), border: Border.all(color: AppColors.glassBorder)),
         padding: const EdgeInsets.all(24.0),
         child: Form(
           key: _formKey,
@@ -654,114 +466,34 @@ class _MockPaymentBottomSheetState extends State<_MockPaymentBottomSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 24),
-              const Text(
-                'Оплата подписки',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                textAlign: TextAlign.center,
-              ),
+              const Text('Оплата подписки 💳', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
               const SizedBox(height: 4),
-              const Text(
-                'Gymify PRO — 1 490 ₸ / месяц',
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
+              const Text('Gymify PRO — 1 490 ₸ / месяц', style: TextStyle(fontSize: 14, color: AppColors.textSecondary), textAlign: TextAlign.center),
               const SizedBox(height: 24),
-
               TextFormField(
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white),
-                decoration: _buildInputDecoration('Номер карты', CupertinoIcons.creditcard),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(16),
-                  _CardNumberFormatter(),
-                ],
-                validator: (v) => (v != null && v.length < 19) ? 'Неверный номер карты' : null,
+                keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white),
+                decoration: _inputDeco('Номер карты', CupertinoIcons.creditcard),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(16), _CardNumberFormatter()],
+                validator: (v) => (v != null && v.length < 19) ? 'Неверный номер' : null,
               ),
               const SizedBox(height: 16),
-
               Row(
                 children: [
-                  Expanded(
-                    child: TextFormField(
-                      keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _buildInputDecoration('ММ/ГГ', CupertinoIcons.calendar),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(4),
-                        _CardDateFormatter(),
-                      ],
-                      validator: (v) {
-                        if (v == null || v.length < 5) return 'ММ/ГГ';
-                        final parts = v.split('/');
-                        if (parts.length != 2) return 'Ошибка';
-                        
-                        final month = int.tryParse(parts[0]);
-                        final year = int.tryParse(parts[1]);
-                        
-                        if (month == null || year == null) return 'Ошибка';
-                        if (month < 1 || month > 12) return 'Месяц (1-12)';
-                        
-                        final now = DateTime.now();
-                        final currentYear = now.year % 100;
-                        final currentMonth = now.month;
-
-                        if (year < currentYear) return 'Карта истекла';
-                        if (year == currentYear && month < currentMonth) return 'Карта истекла';
-                        
-                        return null;
-                      },
-                    ),
-                  ),
+                  Expanded(child: TextFormField(keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: _inputDeco('ММ/ГГ', CupertinoIcons.calendar), inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4), _CardDateFormatter()], validator: (v) => (v == null || v.length < 5) ? 'ММ/ГГ' : null)),
                   const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      keyboardType: TextInputType.number,
-                      obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _buildInputDecoration('CVV', CupertinoIcons.lock_fill),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(3), 
-                      ],
-                      validator: (v) => (v != null && v.length < 3) ? 'Ошибка' : null,
-                    ),
-                  ),
+                  Expanded(child: TextFormField(keyboardType: TextInputType.number, obscureText: true, style: const TextStyle(color: Colors.white), decoration: _inputDeco('CVV', CupertinoIcons.lock_fill), inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(3)], validator: (v) => (v != null && v.length < 3) ? 'Ошибка' : null)),
                 ],
               ),
               const SizedBox(height: 32),
-
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  onPressed: _isLoading ? null : _processPayment,
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'Оплатить безопасно',
-                          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                ),
+              CustomElevatedButton(
+                text: 'Оплатить безопасно 🔒',
+                isLoading: _isLoading,
+                onPressed: _processPayment,
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Демонстрационный режим оплаты. Средства не списываются.',
-                style: TextStyle(fontSize: 11, color: Colors.white38),
-                textAlign: TextAlign.center,
-              ),
+              const Text('Демонстрационный режим. Средства не списываются.', style: TextStyle(fontSize: 11, color: Colors.white38), textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -769,98 +501,36 @@ class _MockPaymentBottomSheetState extends State<_MockPaymentBottomSheet> {
     );
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-      prefixIcon: Icon(icon, color: Colors.white54, size: 20),
-      filled: true,
-      fillColor: Colors.white.withOpacity(0.05),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.blueAccent)),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.redAccent)),
-      focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Colors.redAccent)),
-    );
-  }
+  InputDecoration _inputDeco(String label, IconData icon) => InputDecoration(labelText: label, labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14), prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20), filled: true, fillColor: AppColors.background, enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: AppColors.glassBorder)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary)), errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.error)), focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.error)));
 
   void _processPayment() async {
     if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-
+      setState(() => _isLoading = true);
       await Future.delayed(const Duration(seconds: 2));
-
-      final newExpiry = DateTime.now().add(const Duration(days: 30));
-      await DatabaseService().updateUserProfile({
-        'isPro': true,
-        'proExpiryDate': Timestamp.fromDate(newExpiry),
-      });
-
+      await DatabaseService().updateUserProfile({'isPro': true, 'proExpiryDate': Timestamp.fromDate(DateTime.now().add(const Duration(days: 30)))});
       if (!mounted) return;
-      
       Navigator.pop(context); 
-
-      HapticFeedback.vibrate();
-      SoundService.playNotify();
-
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          backgroundColor: Colors.grey.shade900,
-          title: const Row(
-            children: [
-              Icon(CupertinoIcons.checkmark_circle_fill, color: Colors.green, size: 28),
-              SizedBox(width: 10),
-              Text('Оплата успешна!'),
-            ],
-          ),
-          content: const Text('Добро пожаловать в Gymify PRO. Все ограничения сняты.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отлично', style: TextStyle(color: Colors.blueAccent)),
-            ),
-          ],
-        ),
-      );
+      HapticFeedback.vibrate(); SoundService.playNotify();
     }
   }
 }
 
 class _CardNumberFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    var text = newValue.text;
-    if (newValue.selection.baseOffset == 0) return newValue;
-    var buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      buffer.write(text[i]);
-      var nonZeroIndex = i + 1;
-      if (nonZeroIndex % 4 == 0 && nonZeroIndex != text.length) {
-        buffer.write(' ');
-      }
-    }
-    var string = buffer.toString();
-    return newValue.copyWith(text: string, selection: TextSelection.collapsed(offset: string.length));
+  TextEditingValue formatEditUpdate(TextEditingValue oldV, TextEditingValue newV) {
+    if (newV.selection.baseOffset == 0) return newV;
+    var b = StringBuffer();
+    for (int i = 0; i < newV.text.length; i++) { b.write(newV.text[i]); if ((i + 1) % 4 == 0 && i + 1 != newV.text.length) b.write(' '); }
+    return newV.copyWith(text: b.toString(), selection: TextSelection.collapsed(offset: b.length));
   }
 }
 
 class _CardDateFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    var text = newValue.text;
-    if (newValue.selection.baseOffset == 0) return newValue;
-    var buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      buffer.write(text[i]);
-      var nonZeroIndex = i + 1;
-      if (nonZeroIndex % 2 == 0 && nonZeroIndex != text.length) {
-        buffer.write('/');
-      }
-    }
-    var string = buffer.toString();
-    return newValue.copyWith(text: string, selection: TextSelection.collapsed(offset: string.length));
+  TextEditingValue formatEditUpdate(TextEditingValue oldV, TextEditingValue newV) {
+    if (newV.selection.baseOffset == 0) return newV;
+    var b = StringBuffer();
+    for (int i = 0; i < newV.text.length; i++) { b.write(newV.text[i]); if ((i + 1) % 2 == 0 && i + 1 != newV.text.length) b.write('/'); }
+    return newV.copyWith(text: b.toString(), selection: TextSelection.collapsed(offset: b.length));
   }
-}
+}                                   

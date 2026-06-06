@@ -1,48 +1,54 @@
+import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:training_app/controllers/onboarding_controller.dart';
+import 'package:training_app/presentation/theme/ui_constants.dart';
 
 class ActivityLevelScreen extends StatelessWidget {
   const ActivityLevelScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final activities = [
+      {'level': 'beginner', 'title': 'Низкая', 'desc': 'Офисная работа, мало хожу', 'icon': CupertinoIcons.bed_double_fill, 'color': const Color(0xFF6366F1)},
+      {'level': 'intermediate', 'title': 'Средняя', 'desc': 'Часто гуляю, умеренный труд', 'icon': CupertinoIcons.hare_fill, 'color': AppColors.primary},
+      {'level': 'advanced', 'title': 'Высокая', 'desc': 'Физическая работа весь день', 'icon': CupertinoIcons.rocket_fill, 'color': AppColors.success},
+    ];
 
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Уровень вашей активности?',
-                style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 30),
-              const ActivityCard(
-                icon: Icons.hotel,
-                title: 'Новичок',
-                description: 'Малоподвижный образ жизни',
-                level: 'beginner',
-              ),
-              const SizedBox(height: 15),
-              const ActivityCard(
-                icon: Icons.directions_walk,
-                title: 'Средний',
-                description: 'Тренируюсь 1-3 раза в неделю',
-                level: 'intermediate',
-              ),
-              const SizedBox(height: 15),
-              const ActivityCard(
-                icon: Icons.directions_run,
-                title: 'Продвинутый',
-                description: 'Тренируюсь 4-5 раз в неделю',
-                level: 'advanced',
-              ),
-            ],
-          ),
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppPadding.horizontal),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 20),
+            const Text(
+              "Вне тренировок\nты активен? 🔋",
+              style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1),
+            ).animate().fade(duration: 500.ms).slideY(begin: 0.2, end: 0),
+            const SizedBox(height: 40),
+            
+            ...activities.asMap().entries.map((entry) {
+              int idx = entry.key;
+              Map<String, dynamic> data = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: ActivityCard(
+                  level: data['level'] as String,
+                  title: data['title'] as String,
+                  description: data['desc'] as String,
+                  icon: data['icon'] as IconData,
+                  color: data['color'] as Color,
+                  delay: 200 + (idx * 150),
+                ),
+              );
+            }),
+            const SizedBox(height: 40),
+          ],
         ),
       ),
     );
@@ -50,59 +56,69 @@ class ActivityLevelScreen extends StatelessWidget {
 }
 
 class ActivityCard extends StatelessWidget {
-  final IconData icon;
+  final String level;
   final String title;
   final String description;
-  final String level;
+  final IconData icon;
+  final Color color;
+  final int delay;
 
-  const ActivityCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.level,
-  });
+  const ActivityCard({super.key, required this.level, required this.title, required this.description, required this.icon, required this.color, required this.delay});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final controller = context.watch<OnboardingController>();
     final isSelected = controller.userModel.activityLevel == level;
 
     return GestureDetector(
-      onTap: () => controller.setActivityLevel(level),
-      child: AnimatedContainer(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        controller.setActivityLevel(level);
+      },
+      child: AnimatedScale(
+        scale: isSelected ? 1.02 : 1.0,
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withAlpha(128),
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ]
-              : [],
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 40, color: theme.colorScheme.primary),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                  Text(description, style: theme.textTheme.bodyMedium),
-                ],
+        curve: Curves.easeOutBack,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isSelected ? color : Colors.white.withOpacity(0.1), width: isSelected ? 2 : 1),
+            boxShadow: isSelected ? [BoxShadow(color: color.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))] : [],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: isSelected ? color : Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                      child: Icon(icon, color: isSelected ? Colors.white : color, size: 28),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                          const SizedBox(height: 4),
+                          Text(description, style: TextStyle(fontSize: 14, color: isSelected ? Colors.white70 : Colors.grey[400])),
+                        ],
+                      ),
+                    ),
+                    if (isSelected) const Icon(CupertinoIcons.check_mark_circled_solid, color: Colors.white, size: 28).animate().scale(curve: Curves.easeOutBack),
+                  ],
+                ),
               ),
             ),
-          ],
+          ),
         ),
       ),
-    );
+    ).animate().fade(delay: delay.ms).slideX(begin: 0.1, end: 0);
   }
 }
