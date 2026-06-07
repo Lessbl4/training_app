@@ -3,13 +3,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:training_app/presentation/theme/ui_constants.dart';
 import 'package:training_app/models/user_model.dart';
 import 'package:training_app/services/database_service.dart';
 import 'package:training_app/services/ai_loading_screen.dart';
 import 'package:training_app/presentation/screens/classic_workouts_screen.dart';
 import 'package:training_app/presentation/widgets/modals/glassmorphic_modal.dart';
-import 'package:training_app/presentation/widgets/modals/change_goal_modal.dart';
 import 'package:training_app/services/sound_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -232,6 +232,105 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// --- ВСТРОЕННАЯ КАРТОЧКА ИЗМЕНЕНИЯ ЦЕЛИ ---
+class ChangeGoalModal extends StatelessWidget {
+  final String currentGoal;
+  final String uid;
+
+  const ChangeGoalModal({super.key, required this.currentGoal, required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    final goals = [
+      {'title': 'Похудеть', 'icon': CupertinoIcons.flame_fill, 'color': const Color(0xFFFF512F)},
+      {'title': 'Набрать массу', 'icon': Icons.fitness_center, 'color': AppColors.primary},
+      {'title': 'Поддерживать форму', 'icon': CupertinoIcons.heart_solid, 'color': AppColors.success},
+      {'title': 'Стать сильнее', 'icon': CupertinoIcons.bolt_fill, 'color': AppColors.secondary},
+    ];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          "Изменить цель 🎯",
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          "Твой ИИ-тренер адаптирует план под новую задачу.",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 24),
+        ...goals.map((g) {
+          final isSelected = currentGoal == g['title'];
+          final color = g['color'] as Color;
+
+          return GestureDetector(
+            onTap: () async {
+              SoundService.playClick();
+              try {
+                // Обновляем оба возможных ключа, чтобы 100% сработало (и 'goal', и 'цель')
+                await FirebaseFirestore.instance.collection('users').doc(uid).update({
+                  'goal': g['title'],
+                  'цель': g['title'], 
+                });
+                
+                if (context.mounted) {
+                  Navigator.pop(context); // Закрываем модалку
+                  // Показываем красивое уведомление
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Цель успешно изменена на "${g['title']}"! 🔥', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                }
+              } catch (e) {
+                debugPrint("Ошибка обновления цели: $e");
+              }
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSelected ? color.withOpacity(0.2) : AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isSelected ? color : AppColors.glassBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(g['icon'] as IconData, color: isSelected ? Colors.white : color, size: 24),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      g['title'] as String,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  if (isSelected) const Icon(CupertinoIcons.check_mark_circled_solid, color: Colors.white),
+                ],
+              ),
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("ОТМЕНА", style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+        ),
+      ],
     );
   }
 }

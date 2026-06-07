@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:training_app/presentation/theme/ui_constants.dart';
 
-// Импорты твоих экранов
 import 'package:training_app/presentation/screens/home_screen.dart';
 import 'package:training_app/presentation/screens/cns_test_screen.dart';
 import 'package:training_app/presentation/screens/history_screen.dart';
@@ -14,7 +13,7 @@ import 'package:training_app/presentation/screens/profile_screen.dart';
 class AnatomyPlaceholderScreen extends StatelessWidget {
   const AnatomyPlaceholderScreen({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(backgroundColor: AppColors.background, body: Center(child: Text("Экран Анатомии (В разработке)", style: TextStyle(color: Colors.white))));
+  Widget build(BuildContext context) => const Scaffold(backgroundColor: AppColors.background, body: Center(child: Text("Экран Анатомии (В разработке) 🧬", style: TextStyle(color: Colors.white))));
 }
 
 class MainNavigation extends StatefulWidget {
@@ -31,7 +30,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const AnatomyPlaceholderScreen(), // 2. Упражнения (Анатомия)
-    const CnsTestScreen(),            // 3. Тест ЦНС
+    const CNSTestScreen(),            // 3. Тест ЦНС (ИСПРАВЛЕНО НА CNSTestScreen)
     const HistoryScreen(),            // 4. История
     const ProfileScreen(),            // 5. Профиль
   ];

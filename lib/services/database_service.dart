@@ -12,16 +12,16 @@ class DatabaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<void> updateUserProfile(Map<String, dynamic> data) async {
-    // print("LOG: Начинаю обновление данных пользователя...");
+    print("LOG: Начинаю обновление данных пользователя...");
     try {
       final firebaseUser = _auth.currentUser;
       if (firebaseUser == null) {
         throw Exception("User not logged in");
       }
       await _db.collection("users").doc(firebaseUser.uid).update(data);
-      // print("LOG: Данные успешно обновлены!");
+      print("LOG: Данные успешно обновлены!");
     } catch (e) {
-      // print("CRITICAL ERROR: $e");
+       print("CRITICAL ERROR: $e");
       rethrow;
     }
   }
@@ -36,7 +36,7 @@ class DatabaseService {
 
   Future<void> forceImportExercises() async {
     // TODO: Добавить поле description в импорт
-    // print('LOG: Начинаю импорт...');
+    print('LOG: Начинаю импорт...');
     final String response =
         await rootBundle.loadString('assets/gym_exercises.json');
     final data = await json.decode(response) as Map<String, dynamic>;
@@ -52,7 +52,7 @@ class DatabaseService {
     }
 
     await batch.commit();
-    // print('LOG: Импорт завершен успешно!');
+   print('LOG: Импорт завершен успешно!');
   }
 
   Future<List<ExerciseModel>> getExercisesForWorkout(String workoutType) async {
