@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:training_app/presentation/theme/ui_constants.dart';
 import 'package:training_app/widgets/custom_buttons.dart';
 
@@ -18,19 +20,23 @@ class CNSTestScreen extends StatefulWidget {
   State<CNSTestScreen> createState() => _CNSTestScreenState();
 }
 
-class _CNSTestScreenState extends State<CNSTestScreen> with SingleTickerProviderStateMixin {
+class _CNSTestScreenState extends State<CNSTestScreen> {
   bool _isRecording = false;
   bool _isTestFinished = false;
   double _stabilityScore = 0.0;
   double _timer = 10.0;
   
   Timer? _countdownTimer;
-  StreamSubscription<UserAccelerometerEvent>? _accelSubscription;
+  StreamSubscription<AccelerometerEvent>? _accelSubscription;
   
-  // Данные для графика и честного расчета
-  final List<double> _tremorHistory = List.filled(100, 0.0); // Кольцевой буфер для графика
+  final List<double> _tremorHistory = List.filled(100, 0.0, growable: true);
   double _totalTremor = 0;
   int _sampleCount = 0;
+  double _currentTremor = 0.0;
+  
+  double _lastX = 0.0;
+  double _lastY = 0.0;
+  double _lastZ = 0.0;
 
   @override
   void dispose() {
@@ -44,79 +50,96 @@ class _CNSTestScreenState extends State<CNSTestScreen> with SingleTickerProvider
     setState(() {
       _isRecording = true;
       _isTestFinished = false;
-      _stabilityScore = 0.0;
       _timer = 10.0;
       _totalTremor = 0;
       _sampleCount = 0;
+      _currentTremor = 0.0;
+      _lastX = 0.0;
+      _lastY = 0.0;
+      _lastZ = 0.0;
       _tremorHistory.fillRange(0, _tremorHistory.length, 0.0);
     });
 
-    _countdownTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+    _countdownTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       if (!mounted) return;
       setState(() {
-        _timer -= 0.1;
+        _timer -= 0.05;
+        _tremorHistory.removeAt(0);
+        _tremorHistory.add(_currentTremor);
+        
         if (_timer <= 0) _stopTest();
       });
     });
 
-    // Читаем датчики без учета гравитации (только чистые движения руки)
-    _accelSubscription = userAccelerometerEventStream().listen((event) {
+    _accelSubscription = accelerometerEventStream().listen((event) {
       if (!_isRecording) return;
       
-      // Вектор микровибраций
-      double tremor = sqrt(pow(event.x, 2) + pow(event.y, 2) + pow(event.z, 2));
-      
-      _totalTremor += tremor;
-      _sampleCount++;
+      if (_lastX == 0.0 && _lastY == 0.0 && _lastZ == 0.0) {
+        _lastX = event.x;
+        _lastY = event.y;
+        _lastZ = event.z;
+        return;
+      }
 
-      setState(() {
-        _tremorHistory.removeAt(0);
-        _tremorHistory.add(tremor);
-      });
+      double delta = sqrt(pow(event.x - _lastX, 2) + pow(event.y - _lastY, 2) + pow(event.z - _lastZ, 2));
+      
+      _lastX = event.x;
+      _lastY = event.y;
+      _lastZ = event.z;
+
+      _currentTremor = delta.clamp(0.0, 3.0);
+      _totalTremor += _currentTremor;
+      _sampleCount++;
     });
   }
 
-  Future<void> _stopTest() async {
-    _countdownTimer?.cancel();
-    _accelSubscription?.cancel();
-    HapticFeedback.vibrate();
+ Future<void> _stopTest() async {
+  _countdownTimer?.cancel();
+  _accelSubscription?.cancel();
+  HapticFeedback.vibrate();
 
-    // Алгоритм расчета (Tremor обычно от 0.05 до 2.0)
-    double avgTremor = _sampleCount > 0 ? _totalTremor / _sampleCount : 0;
-    // Если тремор 0.1 -> 100%. Если 1.5 -> 0%
-    double score = (100 - ((avgTremor - 0.1) * 70)).clamp(0, 100);
+  double avgTremor = _sampleCount > 0 ? _totalTremor / _sampleCount : 0;
+  double score = (100 - (avgTremor * 60)).clamp(0, 100);
 
-    setState(() {
-      _isRecording = false;
-      _isTestFinished = true;
-      _timer = 0.0;
-      _stabilityScore = score;
-    });
+  setState(() {
+    _isRecording = false;
+    _isTestFinished = true;
+    _stabilityScore = score;
+  });
 
-    // Сохраняем в Firebase для профиля
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      try {
-        await FirebaseFirestore.instance.collection('users').doc(uid).update({
-          'cnsScore': score,
-          'cnsLastUpdate': FieldValue.serverTimestamp(),
-        });
-      } catch (e) {
-        debugPrint("Ошибка сохранения ЦНС: $e");
-      }
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid != null) {
+    try {
+      // Сначала добавляем результат в историю
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'cnsHistory': FieldValue.arrayUnion([score]),
+        'cnsLastUpdate': FieldValue.serverTimestamp(),
+      });
+
+      // Читаем обновлённый документ и пересчитываем среднее
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final history = List<dynamic>.from(doc.data()?['cnsHistory'] ?? [score]);
+      final avgScore = history.map((e) => (e as num).toDouble()).reduce((a, b) => a + b) / history.length;
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'cnsScore': avgScore,
+      });
+    } catch (e) {
+      debugPrint(e.toString());
     }
   }
+}
 
   Color _getStatusColor(double score) {
     if (score < 40) return AppColors.error;
-    if (score < 75) return const Color(0xFFF59E0B); // Amber
+    if (score < 75) return const Color(0xFFF59E0B);
     return AppColors.success;
   }
 
   String _getStatusText(double score) {
-    if (score < 40) return "Сильное утомление. Снизь веса или отдохни.";
-    if (score < 75) return "ЦНС в норме. Стандартная тренировка.";
-    return "Идеально! Время бить рекорды 🚀";
+    if (score < 40) return "Высокое утомление";
+    if (score < 75) return "ЦНС в норме";
+    return "Идеальная готовность";
   }
 
   @override
@@ -125,18 +148,18 @@ class _CNSTestScreenState extends State<CNSTestScreen> with SingleTickerProvider
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text("Анализ ЦНС 🧠", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 24)),
-        centerTitle: false,
-      ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: AppPadding.horizontal, vertical: 20),
           child: Column(
             children: [
-              // Стеклянная плашка с инструкцией
+              const Text(
+                "АНАЛИЗ ЦНС", 
+                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 2)
+              ),
+              const SizedBox(height: 20),
+              
               ClipRRect(
                 borderRadius: AppBorderRadius.circularMedium,
                 child: BackdropFilter(
@@ -164,60 +187,63 @@ class _CNSTestScreenState extends State<CNSTestScreen> with SingleTickerProvider
                 ),
               ),
               
-              const Spacer(),
+              const SizedBox(height: 40),
 
-              // Живой график и результаты
               Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Неоновое свечение на фоне
                   Container(
-                    width: 200,
-                    height: 200,
+                    width: 200, height: 200,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
+                      shape: BoxShape.circle, 
                       boxShadow: [
-                        BoxShadow(color: currentColor.withOpacity(0.15), blurRadius: 60, spreadRadius: 20),
-                      ],
+                        BoxShadow(color: currentColor.withOpacity(0.15), blurRadius: 60, spreadRadius: 20)
+                      ]
                     ),
                   ),
                   
-                  // Сам визуализатор
                   if (_isRecording || !_isTestFinished)
-                    SizedBox(
-                      height: 150,
-                      width: double.infinity,
-                      child: CustomPaint(
-                        painter: TremorWavePainter(history: _tremorHistory, color: currentColor),
+                    ClipRect(
+                      child: SizedBox(
+                        height: 150, width: double.infinity,
+                        child: CustomPaint(painter: TremorWavePainter(history: _tremorHistory, color: currentColor)),
                       ),
                     ),
 
-                  // Результат
                   if (_isTestFinished)
                     Column(
                       children: [
                         Text(
-                          "${_stabilityScore.toInt()}%",
-                          style: TextStyle(fontSize: 72, fontWeight: FontWeight.w900, color: currentColor, shadows: [Shadow(color: currentColor.withOpacity(0.5), blurRadius: 20)]),
+                          "${_stabilityScore.toInt()}%", 
+                          style: TextStyle(
+                            fontSize: 72, 
+                            fontWeight: FontWeight.w900, 
+                            color: currentColor, 
+                            shadows: [Shadow(color: currentColor.withOpacity(0.5), blurRadius: 20)]
+                          )
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _getStatusText(_stabilityScore),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          _getStatusText(_stabilityScore), 
+                          textAlign: TextAlign.center, 
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
                         ),
                       ],
                     ),
                 ],
               ),
               
-              const Spacer(),
+              const SizedBox(height: 40),
               
-              // Таймер
               if (_isRecording)
                 Text(
-                  _timer.toStringAsFixed(1),
-                  style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w900, color: Colors.white, fontFeatures: [ui.FontFeature.tabularFigures()]),
+                  _timer.toStringAsFixed(1), 
+                  style: const TextStyle(
+                    fontSize: 48, 
+                    fontWeight: FontWeight.w900, 
+                    color: Colors.white, 
+                    fontFeatures: [ui.FontFeature.tabularFigures()]
+                  )
                 ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1.seconds, color: AppColors.accent),
 
               const SizedBox(height: 40),
@@ -229,8 +255,7 @@ class _CNSTestScreenState extends State<CNSTestScreen> with SingleTickerProvider
                 onPressed: _isRecording ? null : _startTest,
               ),
               
-              // Защитный отступ для плавающей панели навигации
-              const SizedBox(height: 100),
+              const SizedBox(height: 120), 
             ],
           ),
         ),
@@ -239,7 +264,6 @@ class _CNSTestScreenState extends State<CNSTestScreen> with SingleTickerProvider
   }
 }
 
-// Кастомный рендерер живых волн тремора (SpaceX стиль)
 class TremorWavePainter extends CustomPainter {
   final List<double> history;
   final Color color;
@@ -265,34 +289,22 @@ class TremorWavePainter extends CustomPainter {
 
     final path = Path();
     final widthStep = size.width / (history.length - 1);
-    
-    // Базовая линия - центр
     final centerY = size.height / 2;
 
     for (int i = 0; i < history.length; i++) {
       final x = i * widthStep;
-      // Увеличиваем масштаб колебаний для наглядности
       final yOffset = history[i] * 40; 
-      // Чередуем вверх/вниз для красивой волны
       final y = centerY + (i % 2 == 0 ? yOffset : -yOffset);
 
       if (i == 0) {
         path.moveTo(x, y);
       } else {
-        // Плавная кривая
-        final prevX = (i - 1) * widthStep;
-        final prevYOffset = history[i - 1] * 40;
-        final prevY = centerY + ((i - 1) % 2 == 0 ? prevYOffset : -prevYOffset);
-        
-        path.quadraticBezierTo(
-          prevX + widthStep / 2, prevY, 
-          x, y,
-        );
+        path.lineTo(x, y);
       }
     }
 
-    canvas.drawPath(path, glowPaint); // Рисуем неоновое свечение
-    canvas.drawPath(path, paint);     // Рисуем саму линию
+    canvas.drawPath(path, glowPaint); 
+    canvas.drawPath(path, paint);     
   }
 
   @override

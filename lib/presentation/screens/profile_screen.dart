@@ -1,24 +1,24 @@
+import 'dart:io';
+import 'dart:math';
+import 'dart:ui' as ui;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/painting.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:io';
-import 'dart:ui' as ui;
-import 'dart:math';
-
-import 'package:flutter/services.dart'; 
-import 'package:glassmorphism/glassmorphism.dart'; 
+import 'package:glassmorphism/glassmorphism.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 
 import 'package:training_app/presentation/widgets/modals/glassmorphic_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_name_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_height_modal.dart';
 import 'package:training_app/presentation/widgets/modals/edit_weight_modal.dart';
 import 'package:training_app/widgets/custom_buttons.dart';
-import 'package:intl/intl.dart';
-
 import 'package:training_app/services/sound_service.dart';
 import 'package:training_app/models/user_model.dart';
 import 'package:training_app/services/database_service.dart';
@@ -36,6 +36,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
+  
   final picker = ImagePicker();
   bool _isUploading = false;
 
@@ -55,7 +56,12 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
 
       await FirebaseFirestore.instance.collection("users").doc(uid).update({"фото": downloadUrl});
     } catch (e) {
-      debugPrint("Error uploading photo: $e");
+      debugPrint('AVATAR ERROR: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка загрузки фото: $e'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
       setState(() => _isUploading = false);
     }
@@ -118,122 +124,126 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
               }
             }
 
-            // Получаем результат ЦНС из базы (если его еще нет, будет 0)
+            final hasCnsScore = data['cnsScore'] != null;
             final cnsScore = (data['cnsScore'] ?? 0.0).toDouble();
 
-            return SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppPadding.horizontal, vertical: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // --- АВАТАР И ИМЯ ---
-                    Center(
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: pickImage,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 30, spreadRadius: 5)],
+            return RefreshIndicator(
+              color: AppColors.primary,
+              backgroundColor: AppColors.surface,
+              onRefresh: () async {
+                await Future.delayed(const Duration(milliseconds: 500));
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppPadding.horizontal, vertical: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Column(
+                          children: [
+                            GestureDetector(
+                              onTap: pickImage,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 30, spreadRadius: 5)],
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 60,
+                                      backgroundColor: AppColors.surface,
+                                      // cache-bust чтобы Flutter не показывал старую аватарку
+                                      backgroundImage: photoURL.isNotEmpty
+                                          ? NetworkImage('$photoURL?v=${DateTime.now().millisecondsSinceEpoch}')
+                                          : null,
+                                      child: photoURL.isEmpty ? const Icon(CupertinoIcons.person_fill, size: 50, color: AppColors.primary) : null,
+                                    ),
                                   ),
-                                  child: CircleAvatar(
-                                    radius: 60,
-                                    backgroundColor: AppColors.surface,
-                                    backgroundImage: photoURL.isNotEmpty ? NetworkImage(photoURL) : null,
-                                    child: photoURL.isEmpty ? const Icon(CupertinoIcons.person_fill, size: 50, color: AppColors.primary) : null,
+                                  if (_isUploading) const CircularProgressIndicator(color: AppColors.accent),
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle, border: Border.all(color: AppColors.background, width: 3)),
+                                      child: const Icon(CupertinoIcons.camera_fill, size: 16, color: Colors.white),
+                                    ),
                                   ),
-                                ),
-                                if (_isUploading) const CircularProgressIndicator(color: AppColors.accent),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 4,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle, border: Border.all(color: AppColors.background, width: 3)),
-                                    child: const Icon(CupertinoIcons.camera_fill, size: 16, color: Colors.white),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(name, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
-                          const SizedBox(height: 8),
-                          isProActive ? _buildProBadge(daysLeft) : _buildFreeBadge(),
+                            const SizedBox(height: 20),
+                            Text(name, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white)),
+                            const SizedBox(height: 8),
+                            isProActive ? _buildProBadge(daysLeft) : _buildFreeBadge(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      if (hasCnsScore) ...[
+                        const Text("СОСТОЯНИЕ ЦНС", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5)),
+                        const SizedBox(height: 16),
+                        _buildCNSDetailedCard(cnsScore),
+                        const SizedBox(height: 32),
+                      ],
+
+                      Row(
+                        children: [
+                          Expanded(child: _glassStatCard("Рост", heightValue.round().toString(), "см", CupertinoIcons.arrow_up_down)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _glassStatCard("Вес", weightValue.round().toString(), "кг", CupertinoIcons.gauge)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _glassStatCard("Возраст", age.toString(), "лет", CupertinoIcons.person_alt_circle)),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // --- СПИДОМЕТР ЦНС ---
-                    if (cnsScore > 0) ...[
-                      const Text("СОСТОЯНИЕ ЦНС", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5)),
                       const SizedBox(height: 16),
-                      _buildCNSGauge(cnsScore),
+                      BmiCard(height: heightValue, weight: weightValue),
                       const SizedBox(height: 32),
+
+                      _buildSubscriptionCard(context, isProActive, daysLeft, data['proExpiryDate'] != null ? (data['proExpiryDate'] as Timestamp).toDate() : null),
+                      const SizedBox(height: 40),
+
+                      const Text("НАСТРОЙКИ ⚙️", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5)),
+                      const SizedBox(height: 16),
+                      
+                      _premiumSettingTile("Обновить показатели", CupertinoIcons.graph_circle, AppColors.accent, () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => ProgressUpdateScreen(currentWeight: weightValue)));
+                      }),
+                      _premiumSettingTile("Изменить имя", CupertinoIcons.person, Colors.white, () {
+                        showGlassmorphicModal(
+                          context: context,
+                          builder: (context) => EditNameModal(initialValue: name, onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'имя': val})),
+                        );
+                      }),
+                      _premiumSettingTile("Изменить дату рождения", CupertinoIcons.calendar, Colors.white, () {
+                        _showDatePicker(context, data['Дата рождения'] != null ? (data['Дата рождения'] as Timestamp).toDate() : null, (date) {
+                          FirebaseFirestore.instance.collection('users').doc(uid).update({'Дата рождения': date});
+                        });
+                      }),
+                      _premiumSettingTile("Изменить рост", CupertinoIcons.arrow_up_down, Colors.white, () {
+                        showGlassmorphicModal(
+                          context: context,
+                          builder: (context) => EditHeightModal(initialValue: heightValue < 100.0 ? 170.0 : heightValue, onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'высота': val})),
+                        );
+                      }),
+                      _premiumSettingTile("Изменить вес", CupertinoIcons.gauge, Colors.white, () {
+                        showGlassmorphicModal(
+                          context: context,
+                          builder: (context) => EditWeightModal(initialValue: weightValue < 30.0 ? 70.0 : weightValue, onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'вес': val})),
+                        );
+                      }),
+                      const SizedBox(height: 120),
                     ],
-
-                    // --- БАЗОВАЯ СТАТИСТИКА ---
-                    Row(
-                      children: [
-                        Expanded(child: _glassStatCard("Рост", heightValue.round().toString(), "см", CupertinoIcons.arrow_up_down)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _glassStatCard("Вес", weightValue.round().toString(), "кг", CupertinoIcons.gauge)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _glassStatCard("Возраст", age.toString(), "лет", CupertinoIcons.person_alt_circle)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    BmiCard(height: heightValue, weight: weightValue), 
-                    const SizedBox(height: 32),
-
-                    // --- ПОДПИСКА PRO ---
-                    _buildSubscriptionCard(context, isProActive, daysLeft, data['proExpiryDate'] != null ? (data['proExpiryDate'] as Timestamp).toDate() : null),
-                    const SizedBox(height: 40),
-
-                    // --- НАСТРОЙКИ ---
-                    const Text("НАСТРОЙКИ ⚙️", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5)),
-                    const SizedBox(height: 16),
-                    
-                    _premiumSettingTile("Обновить показатели", CupertinoIcons.graph_circle, AppColors.accent, () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => ProgressUpdateScreen(currentWeight: weightValue)));
-                    }),
-                    _premiumSettingTile("Изменить имя", CupertinoIcons.person, Colors.white, () {
-                      showGlassmorphicModal(
-                        context: context,
-                        builder: (context) => EditNameModal(initialValue: name, onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'имя': val})),
-                      );
-                    }),
-                    _premiumSettingTile("Изменить дату рождения", CupertinoIcons.calendar, Colors.white, () {
-                      _showDatePicker(context, data['Дата рождения'] != null ? (data['Дата рождения'] as Timestamp).toDate() : null, (date) {
-                        FirebaseFirestore.instance.collection('users').doc(uid).update({'Дата рождения': date});
-                      });
-                    }),
-                    _premiumSettingTile("Изменить рост", CupertinoIcons.arrow_up_down, Colors.white, () {
-                      showGlassmorphicModal(
-                        context: context,
-                        builder: (context) => EditHeightModal(initialValue: heightValue < 100.0 ? 170.0 : heightValue, onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'высота': val})),
-                      );
-                    }),
-                    _premiumSettingTile("Изменить вес", CupertinoIcons.gauge, Colors.white, () {
-                      showGlassmorphicModal(
-                        context: context,
-                        builder: (context) => EditWeightModal(initialValue: weightValue < 30.0 ? 70.0 : weightValue, onSave: (val) => FirebaseFirestore.instance.collection('users').doc(uid).update({'вес': val})),
-                      );
-                    }),
-                    const SizedBox(height: 120), // Отступ для парящей панели навигации
-                  ],
+                  ),
                 ),
               ),
             );
-          } catch (e, stackTrace) {
-            debugPrint("Error building profile: $e\n$stackTrace");
+          } catch (e) {
             return const Center(child: Text("Ошибка загрузки профиля.", style: TextStyle(color: Colors.red)));
           }
         },
@@ -241,18 +251,23 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
     );
   }
 
-  // --- КАСТОМНЫЙ ВИДЖЕТ СПИДОМЕТРА ЦНС ---
-  Widget _buildCNSGauge(double score) {
+  Widget _buildCNSDetailedCard(double score) {
     Color getStatusColor() {
       if (score < 40) return AppColors.error;
       if (score < 75) return const Color(0xFFF59E0B);
       return AppColors.success;
     }
 
-    String getStatusText() {
-      if (score < 40) return "Истощение / Перетрен";
-      if (score < 75) return "Нормальная нагрузка";
-      return "Оптимальная готовность";
+    String getStatusTitle() {
+      if (score < 40) return "Истощение";
+      if (score < 75) return "Норма";
+      return "Оптимально";
+    }
+
+    String getStatusDescription() {
+      if (score < 40) return "Высокий уровень утомления. Рекомендуется отдых или легкое восстановительное кардио.";
+      if (score < 75) return "Центральная нервная система в норме. Можно проводить стандартную тренировку со средними весами.";
+      return "ЦНС полностью восстановлена! Твои мышцы готовы к максимальным нагрузкам и установке новых рекордов.";
     }
 
     return ClipRRect(
@@ -269,7 +284,7 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
           child: Column(
             children: [
               SizedBox(
-                height: 120, // Высота полукруга
+                height: 120,
                 width: 240,
                 child: CustomPaint(
                   painter: CNSGaugePainter(score: score),
@@ -277,9 +292,30 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
               ).animate().scale(duration: 800.ms, curve: Curves.easeOutBack),
               const SizedBox(height: 16),
               Text(
-                "${score.toInt()}% - ${getStatusText()}",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: getStatusColor()),
+                "${score.toInt()}% - ${getStatusTitle()}",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: getStatusColor()),
               ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12)
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(CupertinoIcons.info_circle_fill, color: getStatusColor(), size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        getStatusDescription(),
+                        style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              )
             ],
           ),
         ),
@@ -450,7 +486,6 @@ class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveCl
   }
 }
 
-// --- РЕНДЕРЕР СПИДОМЕТРА ---
 class CNSGaugePainter extends CustomPainter {
   final double score;
 
@@ -461,7 +496,6 @@ class CNSGaugePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height);
     final radius = size.width / 2;
 
-    // Фоновая серая дуга
     final bgPaint = Paint()
       ..color = Colors.white.withOpacity(0.05)
       ..style = PaintingStyle.stroke
@@ -470,26 +504,22 @@ class CNSGaugePainter extends CustomPainter {
     
     canvas.drawArc(Rect.fromCircle(center: center, radius: radius), pi, pi, false, bgPaint);
 
-    // Цветной градиент
     final gradientPaint = Paint()
-  ..shader = ui.Gradient.sweep(
-    center, // Первый аргумент — центр градиента (Offset)
-    [AppColors.error, const Color(0xFFF59E0B), AppColors.success], // Цвета
-    [0.0, 0.5, 1.0], // Стопы
-    TileMode.clamp, // Режим заполнения (обязательный параметр)
-    pi, // startAngle
-    pi * 2, // endAngle
-  ) // Метод .createShader(rect) здесь НЕ НУЖЕН, ui.Gradient.sweep уже возвращает Shader!
-  ..style = PaintingStyle.stroke
-  ..strokeWidth = 20
-  ..strokeCap = StrokeCap.round;
+      ..shader = ui.Gradient.sweep(
+        center,
+        const [AppColors.error, Color(0xFFF59E0B), AppColors.success],
+        [0.0, 0.5, 1.0],
+        TileMode.clamp,
+        pi,
+        pi * 2,
+      )
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 20
+      ..strokeCap = StrokeCap.round;
 
-
-    // Вычисляем длину дуги в зависимости от процента
     final sweepAngle = (score / 100) * pi;
     canvas.drawArc(Rect.fromCircle(center: center, radius: radius), pi, sweepAngle, false, gradientPaint);
 
-    // Точка-индикатор на конце
     final dotAngle = pi + sweepAngle;
     final dotX = center.dx + radius * cos(dotAngle);
     final dotY = center.dy + radius * sin(dotAngle);
@@ -546,7 +576,7 @@ class _MockPaymentBottomSheetState extends State<_MockPaymentBottomSheet> {
                   await Future.delayed(const Duration(seconds: 2));
                   await DatabaseService().updateUserProfile({'isPro': true, 'proExpiryDate': Timestamp.fromDate(DateTime.now().add(const Duration(days: 30)))});
                   if (!context.mounted) return;
-                  Navigator.pop(context); 
+                  Navigator.pop(context);
                   HapticFeedback.vibrate(); SoundService.playNotify();
                 },
               ),

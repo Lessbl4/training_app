@@ -8,13 +8,13 @@ import 'package:training_app/presentation/screens/home_screen.dart';
 import 'package:training_app/presentation/screens/cns_test_screen.dart';
 import 'package:training_app/presentation/screens/history_screen.dart';
 import 'package:training_app/presentation/screens/profile_screen.dart';
-
-// ЗАГЛУШКА ДЛЯ ЭКРАНА АНАТОМИИ (КОТОРЫЙ МЫ СДЕЛАЕМ НА 2 ЭТАПЕ)
-class AnatomyPlaceholderScreen extends StatelessWidget {
-  const AnatomyPlaceholderScreen({super.key});
-  @override
-  Widget build(BuildContext context) => const Scaffold(backgroundColor: AppColors.background, body: Center(child: Text("Экран Анатомии (В разработке) 🧬", style: TextStyle(color: Colors.white))));
-}
+import 'package:training_app/presentation/screens/anatomy_screen.dart';
+// // ЗАГЛУШКА ДЛЯ ЭКРАНА АНАТОМИИ (КОТОРЫЙ МЫ СДЕЛАЕМ НА 2 ЭТАПЕ)
+// class AnatomyPlaceholderScreen extends StatelessWidget {
+//   const AnatomyPlaceholderScreen({super.key});
+//   @override
+//   Widget build(BuildContext context) => const Scaffold(backgroundColor: AppColors.background, body: Center(child: Text("Экран Анатомии (В разработке) 🧬", style: TextStyle(color: Colors.white))));
+// }
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -29,7 +29,7 @@ class _MainNavigationState extends State<MainNavigation> {
   // 5 Экранов по твоему плану
   final List<Widget> _screens = [
     const HomeScreen(),
-    const AnatomyPlaceholderScreen(), // 2. Упражнения (Анатомия)
+    const AnatomyScreen(), // 2. Упражнения (Анатомия)
     const CNSTestScreen(),            // 3. Тест ЦНС (ИСПРАВЛЕНО НА CNSTestScreen)
     const HistoryScreen(),            // 4. История
     const ProfileScreen(),            // 5. Профиль
