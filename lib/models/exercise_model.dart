@@ -6,6 +6,7 @@ class ExerciseModel {
   final String targetMuscle;
   final String difficulty;
   final String description;
+  final List<String> tips;
   
   // Твои оригинальные поля (я их вернул!)
   final String? type;
@@ -29,6 +30,7 @@ class ExerciseModel {
     this.recommendedWeight,
     this.recommendedReps,
     this.recommendedRest,
+    this.tips = const [],
   });
 
   ExerciseModel copyWith({
