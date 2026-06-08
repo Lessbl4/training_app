@@ -9,6 +9,7 @@ import 'package:training_app/models/user_model.dart';
 import 'package:training_app/services/database_service.dart';
 import 'package:training_app/services/ai_loading_screen.dart';
 import 'package:training_app/presentation/screens/classic_workouts_screen.dart';
+import 'package:training_app/presentation/screens/history_screen.dart';
 import 'package:training_app/presentation/widgets/modals/glassmorphic_modal.dart';
 import 'package:training_app/services/sound_service.dart';
 
@@ -43,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           final user = snapshot.data!;
           final firstName = user.name?.split(' ').first ?? 'Атлет';
-          final isPro = user.isPro; // ПРОВЕРКА PRO-ВЕРСИИ
+          final isPro = user.isPro; 
 
           return CustomScrollView(
             physics: const BouncingScrollPhysics(),
@@ -70,7 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               Row(
                                 children: [
                                   Text(firstName, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2)),
-                                  // --- PRO БЕЙДЖ ---
                                   if (isPro) ...[
                                     const SizedBox(width: 8),
                                     Container(
@@ -105,7 +105,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // --- ГЛАВНАЯ КАРТОЧКА ИИ ---
                       GestureDetector(
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AILoadingScreen())),
                         child: Container(
@@ -147,13 +146,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Expanded(child: _buildGlassCard(title: "Классика", subtitle: "Базовые программы", icon: CupertinoIcons.flame_fill, color: AppColors.accent, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ClassicWorkoutsScreen())))),
                           const SizedBox(width: 16),
-                          Expanded(child: _buildGlassCard(title: "История", subtitle: "Твой прогресс", icon: CupertinoIcons.chart_bar_alt_fill, color: AppColors.secondary, onTap: () {})),
+                          Expanded(child: _buildGlassCard(title: "История", subtitle: "Твой прогресс", icon: CupertinoIcons.chart_bar_alt_fill, color: AppColors.secondary, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const HistoryScreen())))), // ИСПРАВЛЕНО
                         ],
                       ).animate().fade(delay: 400.ms).slideY(begin: 0.2, end: 0),
 
                       const SizedBox(height: 40),
 
-                      // --- ИЗМЕНЯЕМАЯ КАРТОЧКА ЦЕЛИ ---
                       GestureDetector(
                         onTap: () {
                           SoundService.playClick();
@@ -197,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ).animate().fade(delay: 600.ms).slideY(begin: 0.2, end: 0),
                       
-                      const SizedBox(height: 100), // Отступ для плавающего меню
+                      const SizedBox(height: 100), 
                     ],
                   ),
                 ),
@@ -236,7 +234,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// --- ВСТРОЕННАЯ КАРТОЧКА ИЗМЕНЕНИЯ ЦЕЛИ ---
 class ChangeGoalModal extends StatelessWidget {
   final String currentGoal;
   final String uid;
@@ -274,15 +271,13 @@ class ChangeGoalModal extends StatelessWidget {
             onTap: () async {
               SoundService.playClick();
               try {
-                // Обновляем оба возможных ключа, чтобы 100% сработало (и 'goal', и 'цель')
                 await FirebaseFirestore.instance.collection('users').doc(uid).update({
                   'goal': g['title'],
                   'цель': g['title'], 
                 });
                 
                 if (context.mounted) {
-                  Navigator.pop(context); // Закрываем модалку
-                  // Показываем красивое уведомление
+                  Navigator.pop(context); 
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Цель успешно изменена на "${g['title']}"! 🔥', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),

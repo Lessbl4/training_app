@@ -1,8 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:training_app/models/workout_session_model.dart';
-import 'package:training_app/services/history_service.dart';
 import 'package:training_app/services/sound_service.dart';
 
 class WorkoutCompletionOverlay extends StatefulWidget {
@@ -18,17 +19,43 @@ class _WorkoutCompletionOverlayState extends State<WorkoutCompletionOverlay> {
   @override
   void initState() {
     super.initState();
-    // Сохраняем тренировку в историю при открытии этого экрана
-    HistoryService.addSession(widget.session);
-    SoundService.playNotify(); // Победный звук
+    SoundService.playNotify(); 
+    _saveSessionToFirebase(); // Прямое сохранение в Firebase!
+  }
+
+  Future<void> _saveSessionToFirebase() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        // Железобетонное сохранение напрямую в Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('history')
+            .add({
+          'workoutType': widget.session.workoutType,
+          'startTime': widget.session.startTime.toIso8601String(),
+          'durationInSeconds': widget.session.durationInSeconds,
+          'totalTonnage': widget.session.totalTonnage,
+          'exercises': widget.session.exercises.map((e) => {
+            'name': e.name,
+            'weight': e.recommendedWeight ?? 'Свой',
+            'reps': e.recommendedReps ?? '-',
+          }).toList(),
+        });
+      } catch (e) {
+        debugPrint("Ошибка при сохранении истории: $e");
+      }
+    }
   }
 
   String _getTonnageHype(double tonnage) {
-    if (tonnage < 500) return "Неплохая разминка! Дальше — больше! 💪";
-    if (tonnage < 2000) return "Отличная работа! Ты перетягал вес легкового авто! 🚗💨";
-    if (tonnage < 4000) return "Нифига себе! Ты поднял в сумме вес целого внедорожника! 🚙🔥";
+    if (tonnage <= 0) return "Отличная кардио-сессия или тренировка со своим весом! 🔥";
+    if (tonnage < 500) return "Разминка пройдена! Дальше — больше! 💪";
+    if (tonnage < 2000) return "Офигеть! Ты перетягал в сумме вес легкового авто! 🚗💨";
+    if (tonnage < 4000) return "Нифига себе! Общий вес равен целому внедорожнику! 🚙🔥";
     if (tonnage < 7000) return "ЖЕСТЬ! ${tonnage.toInt()} кг! Это вес взрослого африканского слона! 🐘💥";
-    return "ТЫ ПРОСТО МАШИНА! ${tonnage.toInt()} кг — это вес чертового грузовика! 🚛💀";
+    return "ТЫ ПРОСТО МАШИНА! ${tonnage.toInt()} кг — это вес грузовика! 🚛💀";
   }
 
   String get _formattedTime {
@@ -43,7 +70,6 @@ class _WorkoutCompletionOverlayState extends State<WorkoutCompletionOverlay> {
       backgroundColor: const Color(0xFF0F0F0F),
       body: Stack(
         children: [
-          // Задний фон (свечение)
           Positioned(
             top: -100,
             left: -100,
@@ -68,7 +94,6 @@ class _WorkoutCompletionOverlayState extends State<WorkoutCompletionOverlay> {
                 children: [
                   const Spacer(),
                   
-                  // Иконка огня
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -95,7 +120,6 @@ class _WorkoutCompletionOverlayState extends State<WorkoutCompletionOverlay> {
                   
                   const SizedBox(height: 20),
 
-                  // Дерзкий текст про тоннаж
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     decoration: BoxDecoration(
@@ -112,24 +136,22 @@ class _WorkoutCompletionOverlayState extends State<WorkoutCompletionOverlay> {
 
                   const SizedBox(height: 40),
 
-                  // Карточки со статистикой
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _buildStatCard(CupertinoIcons.timer, _formattedTime, "Время", 800),
-                      _buildStatCard(CupertinoIcons.chart_bar_alt_fill, "${widget.session.totalTonnage.toInt()} кг", "Объем", 1000),
+                      _buildStatCard(CupertinoIcons.chart_bar_alt_fill, "${widget.session.totalTonnage.toInt()} кг", "Общий вес", 1000),
                       _buildStatCard(CupertinoIcons.checkmark_seal_fill, "${widget.session.exercises.length}", "Упр-й", 1200),
                     ],
                   ),
                   
                   const Spacer(),
                   
-                  // Кнопка
                   SizedBox(
                     width: double.infinity,
                     height: 65,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context), // Возврат на главную
+                      onPressed: () => Navigator.pop(context), 
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black,
@@ -165,7 +187,7 @@ class _WorkoutCompletionOverlayState extends State<WorkoutCompletionOverlay> {
           children: [
             Icon(icon, color: Colors.blueAccent, size: 28),
             const SizedBox(height: 12),
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+            Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
             Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w600)),
           ],
