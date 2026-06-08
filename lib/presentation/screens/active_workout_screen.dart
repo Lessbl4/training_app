@@ -8,13 +8,22 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:training_app/models/exercise_model.dart';
+import 'package:training_app/models/workout_session_model.dart';
 import 'package:training_app/services/sound_service.dart';
+import 'package:training_app/services/ai_trainer_service.dart';
+import 'package:training_app/presentation/widgets/workout_completion_overlay.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
   final String title;
   final List<ExerciseModel> exercises;
+  final int? workoutIndex; // Сделали необязательным (?)
 
-  const ActiveWorkoutScreen({super.key, required this.title, required this.exercises});
+  const ActiveWorkoutScreen({
+    super.key, 
+    required this.title, 
+    required this.exercises, 
+    this.workoutIndex // Убрали required
+  });
 
   @override
   State<ActiveWorkoutScreen> createState() => _ActiveWorkoutScreenState();
@@ -27,11 +36,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   late List<int> _totalSetsCount;
   late List<int> _completedSetsCount;
   
-  // Состояния отдыха и ЦНС
   bool _isResting = false;
   int _restSeconds = 0;
   int _initialRestSeconds = 0;
   Timer? _restTimer;
+
+  bool _cnsTestPassedForCurrentExercise = false;
+  final DateTime _workoutStartTime = DateTime.now();
 
   @override
   void initState() {
@@ -48,9 +59,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }).toList();
   }
 
-  // --- ЛОГИКА ТАЙМЕРА И ОТДЫХА ---
-
-  // Форматирование времени в мм:сс
   String get _formattedTime {
     int m = _restSeconds ~/ 60;
     int s = _restSeconds % 60;
@@ -83,12 +91,15 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     });
   }
 
+  void _skipRest() {
+    _stopRestPhase();
+  }
+
   void _addExtraRest(int seconds) {
     setState(() {
       _restSeconds += seconds;
-      _initialRestSeconds += seconds; // Чтобы кольцо не сломалось
+      _initialRestSeconds += seconds;
     });
-    // Если таймер стоял, запускаем снова
     if (_restTimer == null || !_restTimer!.isActive) {
       _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (_restSeconds > 0) {
@@ -106,7 +117,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       setState(() {
         _completedSetsCount[_currentPage]++;
       });
-      // Если упражнение закончено, все равно требуем отдых и тест перед следующим
+      if (_completedSetsCount[_currentPage] == _totalSetsCount[_currentPage]) {
+        _cnsTestPassedForCurrentExercise = false;
+      }
       _startRestTimer(defaultRest);
     }
   }
@@ -118,12 +131,55 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     super.dispose();
   }
 
-  void _finishWorkout() {
+  double _calculateTonnage() {
+    double total = 0;
+    for (int i = 0; i < widget.exercises.length; i++) {
+      if (_completedSetsCount[i] > 0) {
+        double w = 0;
+        String weightStr = widget.exercises[i].recommendedWeight ?? '';
+        final numMatch = RegExp(r'\d+(\.\d+)?').firstMatch(weightStr);
+        if (numMatch != null) w = double.tryParse(numMatch.group(0)!) ?? 0;
+
+        int reps = 10;
+        String repsStr = widget.exercises[i].recommendedReps ?? '';
+        final rMatch = RegExp(r'\d+').firstMatch(repsStr.split('x').last);
+        if (rMatch != null) reps = int.tryParse(rMatch.group(0)!) ?? 10;
+
+        total += w * reps * _completedSetsCount[i];
+      }
+    }
+    return total;
+  }
+
+  void _finishWorkout() async {
     SoundService.playNotify();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('🎉 Тренировка завершена! Отличная работа!'), backgroundColor: Colors.green),
+    _restTimer?.cancel();
+
+    // Отмечаем тренировку только если это план ИИ
+    if (widget.workoutIndex != null) {
+      AITrainerService.markWorkoutCompleted(widget.workoutIndex!);
+    }
+
+    int duration = DateTime.now().difference(_workoutStartTime).inSeconds;
+    double tonnage = _calculateTonnage();
+
+    final session = WorkoutSessionModel(
+      startTime: _workoutStartTime,
+      workoutType: widget.title,
+      exercises: widget.exercises,
+      durationInSeconds: duration,
+      totalTonnage: tonnage,
     );
-    Navigator.pop(context);
+
+    await Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => WorkoutCompletionOverlay(session: session),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+           return FadeTransition(opacity: animation, child: child);
+        },
+      )
+    );
   }
 
   Future<bool> _showExitConfirmation() async {
@@ -141,7 +197,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     ) ?? false;
   }
 
-  // --- ЛОГИКА ЦНС ---
   Future<void> _showCNSModal() async {
     double? resultScore = await showModalBottomSheet<double>(
       context: context,
@@ -149,21 +204,22 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.75, // 75% экрана
+        height: MediaQuery.of(context).size.height * 0.75,
         child: const CNSModalContent(),
       ),
     );
 
     if (resultScore != null) {
       if (resultScore >= 80) {
-        // Успех! ЦНС восстановлена
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("✅ ЦНС в норме! Можно продолжать."), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
         );
-        _stopRestPhase(); // Убираем таймер, возвращаем кнопку
+        setState(() {
+           _cnsTestPassedForCurrentExercise = true;
+        });
+        _stopRestPhase();
       } else {
-        // Провал! ЦНС перегружена
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("⚠️ Высокий тремор! Добавлено 30 сек отдыха."), backgroundColor: Colors.redAccent, duration: Duration(seconds: 3)),
@@ -173,7 +229,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
-  // --- UI ЭЛЕМЕНТЫ ---
   Widget _buildAIChip(IconData icon, String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -198,7 +253,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(total, (index) {
         bool isDone = index < completed;
-        bool isCurrent = index == completed && !_isResting; // Моргает только когда нужно делать
+        bool isCurrent = index == completed && !_isResting;
         
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 6),
@@ -224,8 +279,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // ВМЕСТО bottomSheet теперь мы используем SafeArea + Column, 
-    // чтобы навсегда избавиться от черной полосы снизу.
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -254,7 +307,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 ),
               ),
 
-              // Основной контент (скроллится)
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
@@ -306,7 +358,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 ),
               ),
               
-              // Наша панель управления теперь прямо внизу колонки (нет бага с полосой)
               _buildBottomActionPanel(),
             ],
           ),
@@ -340,14 +391,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         child: _isResting 
-          // --- ИНТЕРФЕЙС ОТДЫХА И ТЕСТА ЦНС ---
           ? Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    const SizedBox(width: 40), // балансировка
+                    const SizedBox(width: 40), 
                     CircularPercentIndicator(
                       radius: 40.0,
                       lineWidth: 6.0,
@@ -358,7 +408,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       circularStrokeCap: CircularStrokeCap.round,
                     ).animate().scaleXY(begin: 0.8, end: 1.0, duration: 400.ms, curve: Curves.easeOutBack),
                     
-                    // Кнопка +15 секунд (сбоку)
                     IconButton(
                       onPressed: () => _addExtraRest(15),
                       icon: const Icon(CupertinoIcons.add_circled_solid, color: Colors.blueAccent, size: 40),
@@ -367,29 +416,47 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                // ОБЯЗАТЕЛЬНАЯ КНОПКА ЦНС
-                GestureDetector(
-                  onTap: _showCNSModal,
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [Colors.purpleAccent.shade400, Colors.deepPurple.shade600]),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: Colors.purple.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                if (isExerciseDone && !_cnsTestPassedForCurrentExercise && !isLastExercise)
+                  GestureDetector(
+                    onTap: _showCNSModal,
+                    child: Container(
+                      height: 56,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [Colors.purpleAccent.shade400, Colors.deepPurple.shade600]),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [BoxShadow(color: Colors.purple.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))],
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(CupertinoIcons.waveform_path, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text("Проверить ЦНС перед следующим", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ).animate(onPlay: (c) => c.repeat(reverse: true)).shimmer(duration: 2.seconds, color: Colors.white24),
+                  )
+                else
+                  GestureDetector(
+                    onTap: _skipRest,
+                    child: Container(
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white10,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child:  Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(CupertinoIcons.forward_fill, color: Colors.white70),
+                          SizedBox(width: 8),
+                          Text(isExerciseDone && isLastExercise ? "Завершить тренировку" : "Пропустить отдых", style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
                     ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(CupertinoIcons.waveform_path, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text("Проверить ЦНС (Обязательно)", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ).animate(onPlay: (c) => c.repeat(reverse: true)).shimmer(duration: 2.seconds, color: Colors.white24),
-                ),
+                  ),
               ],
             )
-          // --- ИНТЕРФЕЙС ТРЕНИРОВКИ ---
           : GestureDetector(
               key: const ValueKey("ActionBtn"),
               onTap: () {
@@ -400,7 +467,10 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     _finishWorkout();
                   } else {
                     _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-                    setState(() => _currentPage++);
+                    setState(() {
+                      _currentPage++;
+                      _cnsTestPassedForCurrentExercise = false;
+                    });
                   }
                 }
               },
@@ -437,9 +507,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 }
 
-// =========================================================================
-// ВНУТРЕННИЙ МОДАЛЬНЫЙ ЭКРАН ТЕСТА ЦНС (Возвращает результат)
-// =========================================================================
 class CNSModalContent extends StatefulWidget {
   const CNSModalContent({super.key});
 
@@ -518,7 +585,6 @@ class _CNSModalContentState extends State<CNSModalContent> {
       _stabilityScore = score;
     });
 
-    // Автоматически закрываем модалку через 2.5 секунды и передаем результат назад
     Future.delayed(const Duration(milliseconds: 2500), () {
       if (mounted) {
         Navigator.pop(context, score);
@@ -589,9 +655,6 @@ class _CNSModalContentState extends State<CNSModalContent> {
   }
 }
 
-// =========================================================================
-// ВИДЕОПЛЕЕР
-// =========================================================================
 class ExerciseVideoPlayer extends StatefulWidget {
   final String videoPath;
   const ExerciseVideoPlayer({super.key, required this.videoPath});
